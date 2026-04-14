@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
@@ -93,11 +93,14 @@ function AddListing({ title, description }) {
   )
 
   const [selectedPhotos, setSelectedPhotos] = useState(activeDraft?.selectedPhotos || [])
-  const [coverPhotoIndex, setCoverPhotoIndex] = useState(0)
+  const [coverPhotoIndex, setCoverPhotoIndex] = useState(activeDraft?.coverPhotoIndex ?? 0)
+  const [activePhotoMenuIndex, setActivePhotoMenuIndex] = useState(null)
   const [uploadError, setUploadError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
-  const [aiNotes, setAiNotes] = useState('')
-  const [aiResult, setAiResult] = useState('')
+  const [aiNotes, setAiNotes] = useState(activeDraft?.aiNotes || '')
+  const [aiResult, setAiResult] = useState(activeDraft?.aiResult || '')
+  const photoMenuRef = useRef(null)
+  const selectedPhotosRef = useRef(selectedPhotos)
   const [formValues, setFormValues] = useState({
     brand: activeDraft?.brand || '',
     model: activeDraft?.model || '',
@@ -108,6 +111,32 @@ function AddListing({ title, description }) {
     plate: activeDraft?.plate || '',
     description: activeDraft?.description || '',
   })
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!photoMenuRef.current?.contains(event.target)) {
+        setActivePhotoMenuIndex(null)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    selectedPhotosRef.current = selectedPhotos
+  }, [selectedPhotos])
+
+  useEffect(() => () => {
+    selectedPhotosRef.current.forEach((photo) => {
+      if (photo.isObjectUrl && photo.previewUrl) {
+        URL.revokeObjectURL(photo.previewUrl)
+      }
+    })
+  }, [])
 
   const handlePhotoChange = (event) => {
     const files = Array.from(event.target.files ?? [])
@@ -127,6 +156,8 @@ function AddListing({ title, description }) {
     const incomingPhotos = files.map((file) => ({
       name: file.name,
       size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+      previewUrl: URL.createObjectURL(file),
+      isObjectUrl: true,
     }))
 
     setSelectedPhotos((current) => {
@@ -141,6 +172,11 @@ function AddListing({ title, description }) {
       })
 
       if (merged.length > 10) {
+        merged.slice(10).forEach((photo) => {
+          if (photo.isObjectUrl && photo.previewUrl) {
+            URL.revokeObjectURL(photo.previewUrl)
+          }
+        })
         setUploadError('Toplamda en fazla 10 fotograf ekleyebilirsin.')
         return merged.slice(0, 10)
       }
@@ -153,8 +189,17 @@ function AddListing({ title, description }) {
   }
 
   const handleRemovePhoto = (index) => {
-    setSelectedPhotos((current) => current.filter((_, itemIndex) => itemIndex !== index))
+    setSelectedPhotos((current) =>
+      current.filter((photo, itemIndex) => {
+        if (itemIndex === index && photo.isObjectUrl && photo.previewUrl) {
+          URL.revokeObjectURL(photo.previewUrl)
+        }
+
+        return itemIndex !== index
+      }),
+    )
     setCoverPhotoIndex((current) => (index === current ? 0 : Math.max(0, current - (index < current ? 1 : 0))))
+    setActivePhotoMenuIndex(null)
   }
 
   const handleFieldChange = (field) => (event) => {
@@ -180,7 +225,10 @@ function AddListing({ title, description }) {
     plate: formValues.plate,
     description: formValues.description,
     plateMasked: formValues.plate ? maskPlateValue(formValues.plate) : 'Plaka yok',
-    selectedPhotos,
+    selectedPhotos: selectedPhotos.map((photo) => ({
+      name: photo.name,
+      size: photo.size,
+    })),
     coverPhotoIndex,
     aiNotes,
     aiResult,
@@ -238,30 +286,56 @@ function AddListing({ title, description }) {
                   </p>
                   {uploadError ? <p className="form-error">{uploadError}</p> : null}
                   {selectedPhotos.length ? (
-                    <div className="upload-list">
+                    <div ref={photoMenuRef} className="upload-grid">
                       {selectedPhotos.map((photo, index) => (
-                        <div key={`${photo.name}-${index}`} className="upload-item upload-item--row">
-                          <div>
-                            <strong>{photo.name}</strong>
+                        <article
+                          key={`${photo.name}-${index}`}
+                          className={`upload-item upload-item--tile${coverPhotoIndex === index ? ' is-cover' : ''}`}
+                        >
+                          <div className="upload-item__visual">
+                            {photo.previewUrl ? (
+                              <img src={photo.previewUrl} alt={photo.name} />
+                            ) : (
+                              <span>{String(index + 1).padStart(2, '0')}</span>
+                            )}
+                            {coverPhotoIndex === index ? (
+                              <span className="upload-item__badge">Kapak</span>
+                            ) : (
+                              <>
+                                <button
+                                  className="upload-item__menu-button"
+                                  type="button"
+                                  aria-label={`${photo.name} icin islemler`}
+                                  onClick={() =>
+                                    setActivePhotoMenuIndex((current) => (current === index ? null : index))
+                                  }
+                                >
+                                  ...
+                                </button>
+                                {activePhotoMenuIndex === index ? (
+                                  <div className="upload-item__menu">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCoverPhotoIndex(index)
+                                        setActivePhotoMenuIndex(null)
+                                      }}
+                                    >
+                                      Kapak yap
+                                    </button>
+                                    <button type="button" onClick={() => handleRemovePhoto(index)}>
+                                      Sil
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </>
+                            )}
+                          </div>
+                          <div className="upload-item__meta">
+                            <strong title={photo.name}>{photo.name}</strong>
                             <span>{photo.size}</span>
                           </div>
-                          <div className="upload-item__actions">
-                            <button
-                              className={`ghost-button ghost-button--compact${coverPhotoIndex === index ? ' is-active' : ''}`}
-                              type="button"
-                              onClick={() => setCoverPhotoIndex(index)}
-                            >
-                              {coverPhotoIndex === index ? 'Kapak Foto' : 'Kapak Yap'}
-                            </button>
-                            <button
-                              className="ghost-button ghost-button--danger ghost-button--compact"
-                              type="button"
-                              onClick={() => handleRemovePhoto(index)}
-                            >
-                              Sil
-                            </button>
-                          </div>
-                        </div>
+                        </article>
                       ))}
                     </div>
                   ) : (
