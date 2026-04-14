@@ -11,6 +11,7 @@ function ProfilePage() {
   const [selectedTab, setSelectedTab] = useState('ilanlar')
   const {
     activeChats,
+    allListings,
     draftListings,
     favorites,
     markNotificationsRead,
@@ -28,7 +29,7 @@ function ProfilePage() {
 
   const ownedListings = [...userListings, ...demoListings]
   const favoriteItems = favorites
-    .map((id) => featuredBikes.find((item) => item.id === id))
+    .map((id) => allListings.find((item) => item.id === id))
     .filter(Boolean)
 
   const unreadNotifications = notifications.filter((item) => item.unread).length

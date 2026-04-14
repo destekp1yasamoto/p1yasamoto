@@ -975,6 +975,42 @@
   color: #9098a5;
 }
 
+.upload-item--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.upload-item--row strong {
+  display: block;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.upload-item--row span {
+  color: #8b93a2;
+  font-size: 0.9rem;
+}
+
+.upload-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ghost-button--compact {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.ghost-button.is-active {
+  border-color: rgba(214, 47, 47, 0.35);
+  color: #fff;
+  background: rgba(214, 47, 47, 0.18);
+}
+
 .form-error {
   margin: 8px 0 0;
   color: #ff8787;
@@ -987,6 +1023,32 @@
 
 .plate-preview strong {
   color: var(--color-accent);
+}
+
+.textarea-shell--compact {
+  min-height: 110px;
+}
+
+.ai-estimate-card {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: #171717;
+}
+
+.ai-estimate-card h3 {
+  margin: 0 0 12px;
+  color: #fff;
+  font-size: 1.05rem;
+}
+
+.ai-estimate-card pre {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #c6ccd6;
+  font-family: var(--font-body);
+  line-height: 1.55;
 }
 
 .status-pill {

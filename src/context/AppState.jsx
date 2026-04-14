@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppStateContext } from './AppStateContext'
 import { featuredBikes } from '../data/featuredBikes'
+
 const STORAGE_KEY = 'p1yasamoto-app-state'
 
 const defaultState = {
@@ -21,7 +22,7 @@ function buildDemoUser(identifier) {
     identifier,
     email: 'demohesapmoto@gmail.com',
     phone: '05xx xxx xx xx',
-    city: 'İstanbul',
+    city: 'Istanbul',
     joinedAt: "Nisan 2026'dan beri",
     isDemo: true,
     verified: {
@@ -44,23 +45,37 @@ function loadState() {
   }
 }
 
+function formatTurkishDate() {
+  const today = new Date()
+  return `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`
+}
+
 function buildListingRecord(payload, id) {
+  const visual = payload.visual || 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)'
+  const year = payload.year || '2026'
+
   return {
     id,
     title: payload.title || `${payload.brand || 'Motor'} ${payload.model || ''}`.trim(),
-    brand: payload.brand || 'Marka',
-    model: payload.model || 'Model',
-    year: payload.year || '2026',
-    km: payload.km || '0 km',
+    badge: payload.badge || 'Ilk Eklenen',
     price: payload.price || 'Fiyat girilmedi',
-    city: payload.city || 'İstanbul',
+    tag: payload.tag || `${year} Model`,
+    model: payload.model || 'Model',
+    year,
+    km: payload.km || '0 km',
+    city: payload.city || 'Istanbul',
+    owner: payload.owner || 'Satici',
+    brand: payload.brand || 'Marka',
+    phone: payload.phone || 'Telefon eklenmedi',
     plate: payload.plate || '',
     plateMasked: payload.plateMasked || 'Plaka yok',
-    description: payload.description || 'Açıklama eklenmedi.',
+    date: payload.date || formatTurkishDate(),
+    description: payload.description || 'Aciklama eklenmedi.',
+    visual,
+    gallery: payload.gallery || [visual],
     photoCount: payload.selectedPhotos?.length || 0,
     selectedPhotos: payload.selectedPhotos || [],
-    visual: payload.visual || 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)',
-    updatedAt: payload.updatedAt || 'Az önce',
+    updatedAt: payload.updatedAt || 'Az once',
   }
 }
 
@@ -89,6 +104,7 @@ export function AppStateProvider({ children }) {
   const value = useMemo(
     () => ({
       ...state,
+      allListings: [...state.userListings, ...featuredBikes],
       login(identifier) {
         setState((current) => ({
           ...current,
@@ -103,11 +119,11 @@ export function AppStateProvider({ children }) {
           ...current,
           isAuthenticated: true,
           user: {
-            name: payload.name || 'Yeni Üye',
+            name: payload.name || 'Yeni Uye',
             identifier: payload.email || payload.phone || payload.name,
             email: payload.email || 'ornek@mail.com',
             phone: payload.phone || '05xx xxx xx xx',
-            city: payload.city || 'İstanbul',
+            city: payload.city || 'Istanbul',
             joinedAt: "Nisan 2026'dan beri",
             isDemo: false,
             verified: {
@@ -184,28 +200,25 @@ export function AppStateProvider({ children }) {
 
           didCreate = true
 
-          const requestId = `request-${Date.now()}`
-          const notificationId = `notification-${Date.now()}`
-
           return {
             ...current,
             messageRequests: [
               {
-                id: requestId,
+                id: `request-${Date.now()}`,
                 listingId: listing.id,
                 title: listing.title,
                 otherUser: listing.owner,
-                preview: 'Mesaj isteğin gönderildi, satıcı onayı bekleniyor.',
+                preview: 'Mesaj istegin gonderildi, satici onayi bekleniyor.',
                 status: 'pending',
-                date: 'Az önce',
+                date: 'Az once',
               },
               ...current.messageRequests,
             ],
             notifications: [
               {
-                id: notificationId,
-                title: 'Mesaj isteği gönderildi',
-                body: `${listing.title} ilanı için isteğin satıcıya ulaştı.`,
+                id: `notification-${Date.now()}`,
+                title: 'Mesaj istegi gonderildi',
+                body: `${listing.title} ilani icin istegin saticiya ulasti.`,
                 href: '/profil?tab=mesajlar',
                 unread: true,
                 createdAt: Date.now(),
@@ -236,7 +249,14 @@ export function AppStateProvider({ children }) {
         const draftId = payload.id || `draft-${Date.now()}`
 
         setState((current) => {
-          const record = buildListingRecord(payload, draftId)
+          const record = buildListingRecord(
+            {
+              ...payload,
+              owner: current.user?.name || 'Satici',
+              phone: current.user?.phone || 'Telefon eklenmedi',
+            },
+            draftId,
+          )
           const existingIndex = current.draftListings.findIndex((item) => item.id === draftId)
 
           if (existingIndex >= 0) {
@@ -272,7 +292,8 @@ export function AppStateProvider({ children }) {
               {
                 ...draft,
                 id: `listing-${Date.now()}`,
-                updatedAt: 'Az önce yayına alındı',
+                updatedAt: 'Az once yayina alindi',
+                date: formatTurkishDate(),
               },
               ...current.userListings,
             ],
@@ -283,7 +304,14 @@ export function AppStateProvider({ children }) {
         const listingId = `listing-${Date.now()}`
 
         setState((current) => {
-          const record = buildListingRecord(payload, listingId)
+          const record = buildListingRecord(
+            {
+              ...payload,
+              owner: current.user?.name || 'Satici',
+              phone: current.user?.phone || 'Telefon eklenmedi',
+            },
+            listingId,
+          )
 
           return {
             ...current,
@@ -293,7 +321,7 @@ export function AppStateProvider({ children }) {
             userListings: [
               {
                 ...record,
-                updatedAt: 'Az önce yayına alındı',
+                updatedAt: 'Az once yayina alindi',
               },
               ...current.userListings,
             ],

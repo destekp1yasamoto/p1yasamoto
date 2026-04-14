@@ -1,10 +1,16 @@
 import { FilterIcon, SearchIcon } from './Icons'
 
 function SearchPanel({
+  cityOptions,
+  filters,
   filtersOpen,
-  onToggleFilters,
+  onApplyFilters,
+  onFilterChange,
   onResetFilters,
-  filterFields,
+  onSearchChange,
+  onToggleFilters,
+  searchQuery,
+  searchSuggestions,
 }) {
   return (
     <div className="search-shell">
@@ -18,9 +24,17 @@ function SearchPanel({
             type="search"
             placeholder="Marka, model veya anahtar kelime..."
             aria-label="İlan araması"
+            value={searchQuery}
+            onChange={(event) => onSearchChange(event.target.value)}
+            list="listing-search-suggestions"
           />
+          <datalist id="listing-search-suggestions">
+            {searchSuggestions.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
         </label>
-        <button className="primary-button search-row__button" type="button">
+        <button className="primary-button search-row__button" type="button" onClick={onApplyFilters}>
           Ara
         </button>
         <button
@@ -36,31 +50,59 @@ function SearchPanel({
       {filtersOpen ? (
         <div className="filter-panel">
           <div className="filter-grid">
-            {filterFields.map((field) => (
-              <label key={field.name} className="field-stack">
-                <span>{field.label}</span>
-                {field.type === 'select' ? (
-                  <select className="select-shell" defaultValue={field.placeholder}>
-                    {field.options.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    className="input-shell"
-                    type="text"
-                    name={field.name}
-                    placeholder={field.placeholder}
-                  />
-                )}
-              </label>
-            ))}
+            <label className="field-stack">
+              <span>Şehir</span>
+              <input
+                className="input-shell"
+                type="text"
+                placeholder="Tüm şehirler"
+                value={filters.city}
+                onChange={(event) => onFilterChange('city', event.target.value)}
+                list="turkey-city-list"
+              />
+              <datalist id="turkey-city-list">
+                {cityOptions.map((city) => (
+                  <option key={city} value={city} />
+                ))}
+              </datalist>
+            </label>
+
+            <label className="field-stack">
+              <span>Min. fiyat</span>
+              <input
+                className="input-shell"
+                type="text"
+                placeholder="₺0"
+                value={filters.priceMin}
+                onChange={(event) => onFilterChange('priceMin', event.target.value)}
+              />
+            </label>
+
+            <label className="field-stack">
+              <span>Max. fiyat</span>
+              <input
+                className="input-shell"
+                type="text"
+                placeholder="₺2.500.000"
+                value={filters.priceMax}
+                onChange={(event) => onFilterChange('priceMax', event.target.value)}
+              />
+            </label>
+
+            <label className="field-stack">
+              <span>Max. km</span>
+              <input
+                className="input-shell"
+                type="text"
+                placeholder="100.000"
+                value={filters.kmMax}
+                onChange={(event) => onFilterChange('kmMax', event.target.value)}
+              />
+            </label>
           </div>
 
           <div className="filter-actions">
-            <button className="primary-button" type="button">
+            <button className="primary-button" type="button" onClick={onApplyFilters}>
               Uygula
             </button>
             <button className="ghost-button" type="button" onClick={onResetFilters}>

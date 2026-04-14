@@ -2,14 +2,13 @@ import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { CompareIcon } from '../components/Icons'
-import { featuredBikes } from '../data/featuredBikes'
 import { useAppState } from '../context/useAppState'
 import '../App.css'
 
 function ComparePage() {
-  const { comparisons } = useAppState()
+  const { allListings, comparisons } = useAppState()
   const compareItems = comparisons
-    .map((id) => featuredBikes.find((item) => item.id === id))
+    .map((id) => allListings.find((item) => item.id === id))
     .filter(Boolean)
 
   return (
@@ -47,7 +46,7 @@ function ComparePage() {
                         <CompareIcon />
                       </span>
                       <h2>Motor {index + 1}</h2>
-                      <p>İlan sayfasından "Karşılaştır"a tıklayarak buraya motor ekleyin.</p>
+                      <p>İlan sayfasından "Karşılaştır" butonuna tıklayarak buraya motor ekleyin.</p>
                       <Link className="primary-button" to="/">
                         İlanlara Gözat
                       </Link>

@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import BikeCard from '../components/BikeCard'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { CompareIcon, PinIcon } from '../components/Icons'
-import { featuredBikes, getBikeById } from '../data/featuredBikes'
 import { useAppState } from '../context/useAppState'
 import '../App.css'
 
@@ -13,6 +12,7 @@ function ListingDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const {
+    allListings,
     comparisons,
     isAuthenticated,
     messageRequests,
@@ -20,7 +20,12 @@ function ListingDetailPage() {
     toggleComparison,
   } = useAppState()
 
-  const bike = getBikeById(id)
+  const bike = allListings.find((item) => item.id === id)
+
+  const relatedItems = useMemo(
+    () => allListings.filter((item) => item.id !== id).slice(0, 2),
+    [allListings, id],
+  )
 
   if (!bike) {
     return <Navigate to="/" replace />
@@ -136,28 +141,27 @@ function ListingDetailPage() {
                 <p>{bike.description}</p>
               </article>
 
-              <section className="section section--tight">
-                <div className="section-bar">
-                  <span className="section-bar__dot" />
-                  <h2>ÇOK BAKILANLAR</h2>
-                </div>
+              {relatedItems.length ? (
+                <section className="section section--tight">
+                  <div className="section-bar">
+                    <span className="section-bar__dot" />
+                    <h2>BENZER İLANLAR</h2>
+                  </div>
 
-                <div className="cards-grid cards-grid--compact">
-                  {featuredBikes
-                    .filter((item) => item.id !== bike.id)
-                    .slice(0, 2)
-                    .map((item) => (
+                  <div className="cards-grid cards-grid--compact">
+                    {relatedItems.map((item) => (
                       <BikeCard key={item.id} bike={item} />
                     ))}
-                </div>
-              </section>
+                  </div>
+                </section>
+              ) : null}
             </div>
 
             <aside className="listing-detail__sidebar">
               <article className="seller-card">
                 <h2>Satıcı Bilgileri</h2>
                 <div className="seller-card__person">
-                  <span className="seller-card__avatar">O</span>
+                  <span className="seller-card__avatar">{(bike.owner || 'S').charAt(0)}</span>
                   <div>
                     <strong>{bike.owner}</strong>
                     <span>Üye</span>

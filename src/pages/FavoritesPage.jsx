@@ -2,14 +2,13 @@ import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import BikeCard from '../components/BikeCard'
 import Footer from '../components/Footer'
-import { featuredBikes } from '../data/featuredBikes'
 import { useAppState } from '../context/useAppState'
 import '../App.css'
 
 function FavoritesPage() {
-  const { favorites } = useAppState()
+  const { allListings, favorites } = useAppState()
   const favoriteItems = favorites
-    .map((id) => featuredBikes.find((item) => item.id === id))
+    .map((id) => allListings.find((item) => item.id === id))
     .filter(Boolean)
 
   return (
