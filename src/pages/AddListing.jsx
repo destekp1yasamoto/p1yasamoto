@@ -36,6 +36,21 @@ function formatLira(value) {
   return `₺${Math.round(value).toLocaleString('tr-TR')}`
 }
 
+function filterSuggestions(options, query) {
+  const normalizedQuery = query.trim().toLowerCase()
+
+  if (!normalizedQuery) {
+    return options.slice(0, 8)
+  }
+
+  const startsWithMatches = options.filter((option) => option.toLowerCase().startsWith(normalizedQuery))
+  const includesMatches = options.filter(
+    (option) => !startsWithMatches.includes(option) && option.toLowerCase().includes(normalizedQuery),
+  )
+
+  return [...startsWithMatches, ...includesMatches].slice(0, 8)
+}
+
 function buildAiEstimate(formValues, aiNotes) {
   const kmValue = parseNumber(formValues.km)
   const yearValue = parseNumber(formValues.year)
@@ -100,7 +115,10 @@ function AddListing({ title, description }) {
   const [aiNotes, setAiNotes] = useState(activeDraft?.aiNotes || '')
   const [aiResult, setAiResult] = useState(activeDraft?.aiResult || '')
   const photoMenuRef = useRef(null)
+  const brandFieldRef = useRef(null)
+  const modelFieldRef = useRef(null)
   const selectedPhotosRef = useRef(selectedPhotos)
+  const [activeSuggestionField, setActiveSuggestionField] = useState(null)
   const [formValues, setFormValues] = useState({
     brand: activeDraft?.brand || '',
     model: activeDraft?.model || '',
@@ -116,6 +134,13 @@ function AddListing({ title, description }) {
     const handlePointerDown = (event) => {
       if (!photoMenuRef.current?.contains(event.target)) {
         setActivePhotoMenuIndex(null)
+      }
+
+      if (
+        !brandFieldRef.current?.contains(event.target)
+        && !modelFieldRef.current?.contains(event.target)
+      ) {
+        setActiveSuggestionField(null)
       }
     }
 
@@ -213,6 +238,14 @@ function AddListing({ title, description }) {
     }))
   }
 
+  const handleSuggestionSelect = (field, value) => {
+    setFormValues((current) => ({
+      ...current,
+      [field]: value,
+    }))
+    setActiveSuggestionField(null)
+  }
+
   const buildPayload = () => ({
     id: activeDraft?.id,
     title: `${formValues.brand} ${formValues.model}`.trim(),
@@ -251,6 +284,8 @@ function AddListing({ title, description }) {
   const maskedPlate = formValues.plate ? maskPlateValue(formValues.plate) : ''
   const brandSuggestions = [...new Set([...popularBrands, ...allListings.map((item) => item.brand).filter(Boolean)])]
   const modelSuggestions = [...new Set([...popularModels, ...allListings.map((item) => item.model).filter(Boolean)])]
+  const visibleBrandSuggestions = filterSuggestions(brandSuggestions, formValues.brand)
+  const visibleModelSuggestions = filterSuggestions(modelSuggestions, formValues.model)
 
   return (
     <div className="page-shell">
@@ -299,7 +334,7 @@ function AddListing({ title, description }) {
                               <span>{String(index + 1).padStart(2, '0')}</span>
                             )}
                             {coverPhotoIndex === index ? (
-                              <span className="upload-item__badge">Kapak</span>
+                              <span className="upload-item__badge">Kapakta</span>
                             ) : (
                               <>
                                 <button
@@ -310,7 +345,9 @@ function AddListing({ title, description }) {
                                     setActivePhotoMenuIndex((current) => (current === index ? null : index))
                                   }
                                 >
-                                  ...
+                                  <span />
+                                  <span />
+                                  <span />
                                 </button>
                                 {activePhotoMenuIndex === index ? (
                                   <div className="upload-item__menu">
@@ -321,15 +358,16 @@ function AddListing({ title, description }) {
                                         setActivePhotoMenuIndex(null)
                                       }}
                                     >
-                                      Kapak yap
+                                      Kapak sec
                                     </button>
                                     <button type="button" onClick={() => handleRemovePhoto(index)}>
-                                      Sil
+                                      Kaldir
                                     </button>
                                   </div>
                                 ) : null}
                               </>
                             )}
+                            <div className="upload-item__shade" />
                           </div>
                           <div className="upload-item__meta">
                             <strong title={photo.name}>{photo.name}</strong>
@@ -344,37 +382,63 @@ function AddListing({ title, description }) {
                 </div>
               </label>
 
-              <label className="field-stack">
+              <label ref={brandFieldRef} className="field-stack">
                 <span>Marka</span>
-                <input
-                  className="input-shell"
-                  type="text"
-                  placeholder="Orn. Yamaha"
-                  value={formValues.brand}
-                  onChange={handleFieldChange('brand')}
-                  list="brand-suggestions"
-                />
-                <datalist id="brand-suggestions">
-                  {brandSuggestions.map((brand) => (
-                    <option key={brand} value={brand} />
-                  ))}
-                </datalist>
+                <div className="suggest-field">
+                  <input
+                    className="input-shell"
+                    type="text"
+                    placeholder="Orn. Yamaha"
+                    value={formValues.brand}
+                    onChange={handleFieldChange('brand')}
+                    onFocus={() => setActiveSuggestionField('brand')}
+                    autoComplete="off"
+                  />
+                  {activeSuggestionField === 'brand' && visibleBrandSuggestions.length ? (
+                    <div className="suggest-field__panel">
+                      {visibleBrandSuggestions.map((brand) => (
+                        <button
+                          key={brand}
+                          className={`suggest-field__option${formValues.brand === brand ? ' is-active' : ''}`}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleSuggestionSelect('brand', brand)}
+                        >
+                          {brand}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </label>
-              <label className="field-stack">
+              <label ref={modelFieldRef} className="field-stack">
                 <span>Model</span>
-                <input
-                  className="input-shell"
-                  type="text"
-                  placeholder="Orn. MT-09"
-                  value={formValues.model}
-                  onChange={handleFieldChange('model')}
-                  list="model-suggestions"
-                />
-                <datalist id="model-suggestions">
-                  {modelSuggestions.map((model) => (
-                    <option key={model} value={model} />
-                  ))}
-                </datalist>
+                <div className="suggest-field">
+                  <input
+                    className="input-shell"
+                    type="text"
+                    placeholder="Orn. MT-09"
+                    value={formValues.model}
+                    onChange={handleFieldChange('model')}
+                    onFocus={() => setActiveSuggestionField('model')}
+                    autoComplete="off"
+                  />
+                  {activeSuggestionField === 'model' && visibleModelSuggestions.length ? (
+                    <div className="suggest-field__panel">
+                      {visibleModelSuggestions.map((model) => (
+                        <button
+                          key={model}
+                          className={`suggest-field__option${formValues.model === model ? ' is-active' : ''}`}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleSuggestionSelect('model', model)}
+                        >
+                          {model}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </label>
               <label className="field-stack">
                 <span>Yil</span>
