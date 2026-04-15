@@ -79,17 +79,17 @@ function buildAiEstimate(formValues, aiNotes) {
       : `${formatLira(askingPrice)} biraz yüksek görünüyor, ${formatLira(estimated)} bandı daha dengeli.`
     : `${formatLira(estimated)} bandı uygun görünüyor.`
 
-  return `Yapay zeka on degerlendirmesi:
+  return `Yapay zeka ön değerlendirmesi:
 Marka: ${formValues.brand || '-'}
 Model: ${formValues.model || '-'}
 CC: ${formValues.cc || '-'}
-Yil: ${formValues.year || '-'}
+Yıl: ${formValues.year || '-'}
 KM: ${formValues.km || '-'}
-Sehir: ${formValues.city || '-'}
+Şehir: ${formValues.city || '-'}
 Notlar: ${aiNotes || 'Ek bilgi girilmedi.'}
 
 Tahmini piyasa yorumu:
-Bu ilan icin yasi ${age || 0} yil olan, kilometre ve kullanici notlari dikkate alinarak ${formatLira(estimated)} seviyesi makul gorunuyor. ${recommendation}`
+Bu ilan için yaşı ${age || 0} yıl olan, kilometre ve kullanıcı notları dikkate alınarak ${formatLira(estimated)} seviyesi makul görünüyor. ${recommendation}`
 }
 
 function AddListing({ title, description }) {
@@ -172,7 +172,7 @@ function AddListing({ title, description }) {
     const oversizedFile = files.find((file) => file.size > 4 * 1024 * 1024)
 
     if (oversizedFile) {
-      setUploadError(`"${oversizedFile.name}" 4 MB sinirini asiyor.`)
+      setUploadError(`"${oversizedFile.name}" 4 MB sınırını aşıyor.`)
       event.target.value = ''
       return
     }
@@ -201,7 +201,7 @@ function AddListing({ title, description }) {
             URL.revokeObjectURL(photo.previewUrl)
           }
         })
-        setUploadError('Toplamda en fazla 10 fotograf ekleyebilirsin.')
+        setUploadError('Toplamda en fazla 10 fotoğraf ekleyebilirsin.')
         return merged.slice(0, 10)
       }
 
@@ -289,7 +289,7 @@ function AddListing({ title, description }) {
 
   const handleSaveDraft = () => {
     saveDraftListing(buildPayload())
-    setStatusMessage('Taslak kaydedildi. Profilindeki Ilanlarim alanindan duzenleyebilirsin.')
+    setStatusMessage('Taslak kaydedildi. Profilindeki İlanlarım alanından düzenleyebilirsin.')
   }
 
   const handlePublish = () => {
@@ -307,19 +307,17 @@ function AddListing({ title, description }) {
     (brand) => brand.toLocaleLowerCase('tr-TR') === formValues.brand.trim().toLocaleLowerCase('tr-TR'),
   )
   const selectedBrandModels = selectedBrand
-    ? brandSuggestions.includes(selectedBrand)
-      ? [
-          ...(brandModels[selectedBrand] || []),
-          ...allListings
-            .filter((item) => item.brand === selectedBrand)
-            .map((item) => item.model)
-            .filter(Boolean),
-        ]
-      : []
+    ? [
+        ...(brandModels[selectedBrand] || []),
+        ...allListings
+          .filter((item) => item.brand === selectedBrand)
+          .map((item) => item.model)
+          .filter(Boolean),
+      ]
     : []
   const modelSuggestions = [...new Set(selectedBrandModels.length ? selectedBrandModels : popularModels)]
   const visibleBrandSuggestions = filterSuggestions(brandSuggestions, formValues.brand)
-  const visibleModelSuggestions = formValues.brand ? filterSuggestions(modelSuggestions, formValues.model) : []
+  const visibleModelSuggestions = selectedBrand ? filterSuggestions(modelSuggestions, formValues.model) : []
   const visibleCitySuggestions = filterSuggestions(turkeyCities, formValues.city)
 
   return (
@@ -328,21 +326,21 @@ function AddListing({ title, description }) {
 
       <main className="page-content">
         <section className="page-hero">
-          <span className="eyebrow">{activeDraft ? 'Taslagi duzenle' : 'Ilan olustur'}</span>
+          <span className="eyebrow">{activeDraft ? 'Taslağı düzenle' : 'İlan oluştur'}</span>
           <h1>{title}</h1>
           <p>{description}</p>
         </section>
 
         <section className="page-grid">
           <article className="form-card">
-            <h2>Temel Ilan Bilgileri</h2>
+            <h2>Temel İlan Bilgileri</h2>
             <p className="field-note">
-              Fotograf yukleme kurallari, kapak fotografi secimi ve on degerlendirme akisi bu ekrana islendi.
+              Fotoğraf yükleme kuralları, kapak fotoğrafı seçimi ve ön değerlendirme akışı bu ekrana işlendi.
             </p>
 
             <div className="form-grid">
               <label className="field-stack field-stack--full">
-                <span>Fotograflar</span>
+                <span>Fotoğraflar</span>
                 <div className="upload-dropzone">
                   <input
                     className="input-shell upload-input"
@@ -352,7 +350,7 @@ function AddListing({ title, description }) {
                     onChange={handlePhotoChange}
                   />
                   <p className="field-note">
-                    Toplamda en fazla 10 fotograf eklenebilir. Her dosya 4 MB altinda olmali.
+                    Toplamda en fazla 10 fotoğraf eklenebilir. Her dosya 4 MB altında olmalı.
                   </p>
                   {uploadError ? <p className="form-error">{uploadError}</p> : null}
                   {selectedPhotos.length ? (
@@ -375,7 +373,7 @@ function AddListing({ title, description }) {
                                 <button
                                   className="upload-item__menu-button"
                                   type="button"
-                                  aria-label={`${photo.name} icin islemler`}
+                                  aria-label={`${photo.name} için işlemler`}
                                   onClick={() =>
                                     setActivePhotoMenuIndex((current) => (current === index ? null : index))
                                   }
@@ -393,10 +391,10 @@ function AddListing({ title, description }) {
                                         setActivePhotoMenuIndex(null)
                                       }}
                                     >
-                                      Kapak sec
+                                      Kapak seç
                                     </button>
                                     <button type="button" onClick={() => handleRemovePhoto(index)}>
-                                      Kaldir
+                                      Kaldır
                                     </button>
                                   </div>
                                 ) : null}
@@ -412,7 +410,7 @@ function AddListing({ title, description }) {
                       ))}
                     </div>
                   ) : (
-                    <p className="field-note">Henuz fotograf secilmedi.</p>
+                    <p className="field-note">Henüz fotoğraf seçilmedi.</p>
                   )}
                 </div>
               </label>
@@ -423,7 +421,7 @@ function AddListing({ title, description }) {
                   <input
                     className="input-shell"
                     type="text"
-                    placeholder="Orn. Yamaha"
+                    placeholder="Örn. Yamaha"
                     value={formValues.brand}
                     onChange={handleFieldChange('brand')}
                     onFocus={() => setActiveSuggestionField('brand')}
@@ -446,13 +444,14 @@ function AddListing({ title, description }) {
                   ) : null}
                 </div>
               </div>
+
               <div ref={modelFieldRef} className="field-stack">
                 <span className="field-stack__label">Model</span>
                 <div className="suggest-field">
                   <input
                     className="input-shell"
                     type="text"
-                    placeholder={selectedBrand ? 'Orn. MT-09' : 'Once marka sec'}
+                    placeholder={selectedBrand ? 'Örn. MT-09' : 'Önce marka seç'}
                     value={formValues.model}
                     onChange={handleFieldChange('model')}
                     onFocus={() => {
@@ -480,8 +479,9 @@ function AddListing({ title, description }) {
                   ) : null}
                 </div>
               </div>
+
               <label className="field-stack">
-                <span>Yil</span>
+                <span>Yıl</span>
                 <input
                   className="input-shell"
                   type="text"
@@ -490,16 +490,18 @@ function AddListing({ title, description }) {
                   onChange={handleFieldChange('year')}
                 />
               </label>
+
               <label className="field-stack">
                 <span>CC</span>
                 <input
                   className="input-shell"
                   type="text"
-                  placeholder="Orn. 600"
+                  placeholder="Örn. 600"
                   value={formValues.cc}
                   onChange={handleFieldChange('cc')}
                 />
               </label>
+
               <label className="field-stack">
                 <span>Kilometre</span>
                 <input
@@ -510,6 +512,7 @@ function AddListing({ title, description }) {
                   onChange={handleFieldChange('km')}
                 />
               </label>
+
               <label className="field-stack">
                 <span>Fiyat</span>
                 <input
@@ -520,13 +523,14 @@ function AddListing({ title, description }) {
                   onChange={handleFieldChange('price')}
                 />
               </label>
+
               <div ref={cityFieldRef} className="field-stack">
-                <span className="field-stack__label">Sehir</span>
+                <span className="field-stack__label">Şehir</span>
                 <div className="suggest-field">
                   <input
                     className="input-shell"
                     type="text"
-                    placeholder="Sehir sec veya yaz"
+                    placeholder="Şehir seç veya yaz"
                     value={formValues.city}
                     onChange={handleFieldChange('city')}
                     onFocus={() => setActiveSuggestionField('city')}
@@ -549,38 +553,41 @@ function AddListing({ title, description }) {
                   ) : null}
                 </div>
               </div>
+
               <label className="field-stack field-stack--full">
-                <span>Plaka (istege bagli)</span>
+                <span>Plaka (isteğe bağlı)</span>
                 <input
                   className="input-shell"
                   type="text"
-                  placeholder="Orn. 34 ABC 123"
+                  placeholder="Örn. 34 ABC 123"
                   value={formValues.plate}
                   onChange={handleFieldChange('plate')}
                 />
                 <p className="field-note">
-                  Son 2 rakam alici tarafinda gizli gorunur. Tam plaka yalnizca satici panelinde gorunur.
+                  Son 2 rakam alıcı tarafında gizli görünür. Tam plaka yalnızca satıcı panelinde görünür.
                 </p>
                 {formValues.plate ? (
                   <p className="plate-preview">
-                    Alici gorunumu: <strong>{maskedPlate}</strong>
+                    Alıcı görünümü: <strong>{maskedPlate}</strong>
                   </p>
                 ) : null}
               </label>
+
               <label className="field-stack field-stack--full">
-                <span>Aciklama</span>
+                <span>Açıklama</span>
                 <textarea
                   className="textarea-shell"
-                  placeholder="Ekspertiz, aksesuarlar ve bakim bilgilerini ekleyin"
+                  placeholder="Ekspertiz, aksesuarlar ve bakım bilgilerini ekleyin"
                   value={formValues.description}
                   onChange={handleFieldChange('description')}
                 />
               </label>
+
               <label className="field-stack field-stack--full">
-                <span>Yapay Zeka Icin Notlar</span>
+                <span>Yapay Zeka İçin Notlar</span>
                 <textarea
                   className="textarea-shell textarea-shell--compact"
-                  placeholder="Orn. Motor 2 yildir bende, hasar kaydi yok, sifira yakin durumda, bakimlari yetkili serviste yapildi..."
+                  placeholder="Örn. Motor 2 yıldır bende, hasar kaydı yok, sıfıra yakın durumda, bakımları yetkili serviste yapıldı..."
                   value={aiNotes}
                   onChange={(event) => setAiNotes(event.target.value)}
                 />
@@ -591,7 +598,7 @@ function AddListing({ title, description }) {
 
             <div className="filter-actions">
               <button className="primary-button" type="button" onClick={handlePublish}>
-                Ilani Yayina Hazirla
+                İlanı Yayına Hazırla
               </button>
               <button className="ghost-button" type="button" onClick={handleSaveDraft}>
                 Taslak Kaydet
@@ -603,30 +610,30 @@ function AddListing({ title, description }) {
 
             {aiResult ? (
               <article className="ai-estimate-card">
-                <h3>Yapay Zeka On Degerlendirme</h3>
+                <h3>Yapay Zeka Ön Değerlendirme</h3>
                 <pre>{aiResult}</pre>
               </article>
             ) : null}
           </article>
 
           <aside className="glass-card">
-            <h2>Ilan kalitesi icin oneriler</h2>
+            <h2>İlan kalitesi için öneriler</h2>
             <div className="card-list">
               <article className="mini-card">
-                <strong>10 fotograf tam destek</strong>
-                Fotograf ekleme alani artik tek seferde ya da parca parca toplam 10 dosyaya kadar calisiyor.
+                <strong>10 fotoğraf tam destek</strong>
+                Fotoğraf ekleme alanı artık tek seferde ya da parça parça toplam 10 dosyaya kadar çalışıyor.
               </article>
               <article className="mini-card">
-                <strong>Kapak foto secimi</strong>
-                Istedigin kareyi "Kapak Yap" ile vitrin gorseli olarak belirleyebilirsin.
+                <strong>Kapak foto seçimi</strong>
+                İstediğin kareyi "Kapak Yap" ile vitrin görseli olarak belirleyebilirsin.
               </article>
               <article className="mini-card">
-                <strong>Yapay zeka yorum alani</strong>
-                Km, hasar, kullanim suresi, sifir ayari ve genel kondisyonu yazarak fiyat bandi yorumu alabilirsin.
+                <strong>Yapay zeka yorum alanı</strong>
+                Km, hasar, kullanım süresi, sıfır ayarı ve genel kondisyonu yazarak fiyat bandı yorumu alabilirsin.
               </article>
               <article className="mini-card">
-                <strong>Taslak akisi</strong>
-                Taslak kaydettigin ilanlari profilindeki Ilanlarim alanindan duzenleyebilir veya tek tusla yayina alabilirsin.
+                <strong>Taslak akışı</strong>
+                Taslak kaydettiğin ilanları profilindeki İlanlarım alanından düzenleyebilir veya tek tuşla yayına alabilirsin.
               </article>
             </div>
           </aside>
