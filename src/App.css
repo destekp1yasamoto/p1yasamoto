@@ -339,6 +339,8 @@
   left: 0;
   right: 0;
   z-index: 14;
+  max-height: min(360px, 46vh);
+  overflow-y: auto;
   padding: 8px;
   display: grid;
   gap: 6px;
@@ -519,6 +521,8 @@
   left: 0;
   right: 0;
   z-index: 12;
+  max-height: min(360px, 46vh);
+  overflow-y: auto;
   padding: 8px;
   display: grid;
   gap: 6px;
@@ -526,6 +530,22 @@
   border-radius: 14px;
   background: rgba(20, 20, 20, 0.98);
   box-shadow: 0 22px 36px rgba(0, 0, 0, 0.38);
+}
+
+.search-input__suggestions::-webkit-scrollbar,
+.suggest-field__panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.search-input__suggestions::-webkit-scrollbar-thumb,
+.suggest-field__panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(181, 13, 13, 0.45);
+}
+
+.search-input__suggestions::-webkit-scrollbar-track,
+.suggest-field__panel::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .suggest-field__option {
