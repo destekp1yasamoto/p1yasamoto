@@ -509,6 +509,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  align-self: start;
 }
 
 .suggest-field {
@@ -574,6 +575,16 @@
   font-weight: 700;
   line-height: 1.1;
   text-transform: uppercase;
+}
+
+.field-stack__label {
+  display: inline-block;
+}
+
+.input-shell:disabled,
+.textarea-shell:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .filter-actions,

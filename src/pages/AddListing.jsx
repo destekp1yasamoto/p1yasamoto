@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { useAppState } from '../context/useAppState'
-import { popularBrands, popularModels, turkeyCities } from '../data/turkeyData'
+import { brandModels, popularBrands, popularModels, turkeyCities } from '../data/turkeyData'
 import '../App.css'
 
 function maskPlateValue(plate) {
@@ -40,12 +40,10 @@ function filterSuggestions(options, query) {
   const normalizedQuery = query.trim().toLocaleLowerCase('tr-TR')
 
   if (!normalizedQuery) {
-    return options.slice(0, 8)
+    return options
   }
 
-  return options
-    .filter((option) => option.toLocaleLowerCase('tr-TR').startsWith(normalizedQuery))
-    .slice(0, 8)
+  return options.filter((option) => option.toLocaleLowerCase('tr-TR').startsWith(normalizedQuery))
 }
 
 function buildAiEstimate(formValues, aiNotes) {
@@ -233,17 +231,37 @@ function AddListing({ title, description }) {
       ? event.target.value.toUpperCase()
       : event.target.value
 
-    setFormValues((current) => ({
-      ...current,
-      [field]: value,
-    }))
+    setFormValues((current) => {
+      if (field === 'brand') {
+        return {
+          ...current,
+          brand: value,
+          model: '',
+        }
+      }
+
+      return {
+        ...current,
+        [field]: value,
+      }
+    })
   }
 
   const handleSuggestionSelect = (field, value) => {
-    setFormValues((current) => ({
-      ...current,
-      [field]: value,
-    }))
+    setFormValues((current) => {
+      if (field === 'brand') {
+        return {
+          ...current,
+          brand: value,
+          model: '',
+        }
+      }
+
+      return {
+        ...current,
+        [field]: value,
+      }
+    })
     setActiveSuggestionField(null)
   }
 
@@ -285,9 +303,23 @@ function AddListing({ title, description }) {
 
   const maskedPlate = formValues.plate ? maskPlateValue(formValues.plate) : ''
   const brandSuggestions = [...new Set([...popularBrands, ...allListings.map((item) => item.brand).filter(Boolean)])]
-  const modelSuggestions = [...new Set([...popularModels, ...allListings.map((item) => item.model).filter(Boolean)])]
+  const selectedBrand = brandSuggestions.find(
+    (brand) => brand.toLocaleLowerCase('tr-TR') === formValues.brand.trim().toLocaleLowerCase('tr-TR'),
+  )
+  const selectedBrandModels = selectedBrand
+    ? brandSuggestions.includes(selectedBrand)
+      ? [
+          ...(brandModels[selectedBrand] || []),
+          ...allListings
+            .filter((item) => item.brand === selectedBrand)
+            .map((item) => item.model)
+            .filter(Boolean),
+        ]
+      : []
+    : []
+  const modelSuggestions = [...new Set(selectedBrandModels.length ? selectedBrandModels : popularModels)]
   const visibleBrandSuggestions = filterSuggestions(brandSuggestions, formValues.brand)
-  const visibleModelSuggestions = filterSuggestions(modelSuggestions, formValues.model)
+  const visibleModelSuggestions = formValues.brand ? filterSuggestions(modelSuggestions, formValues.model) : []
   const visibleCitySuggestions = filterSuggestions(turkeyCities, formValues.city)
 
   return (
@@ -385,8 +417,8 @@ function AddListing({ title, description }) {
                 </div>
               </label>
 
-              <label ref={brandFieldRef} className="field-stack">
-                <span>Marka</span>
+              <div ref={brandFieldRef} className="field-stack">
+                <span className="field-stack__label">Marka</span>
                 <div className="suggest-field">
                   <input
                     className="input-shell"
@@ -413,18 +445,23 @@ function AddListing({ title, description }) {
                     </div>
                   ) : null}
                 </div>
-              </label>
-              <label ref={modelFieldRef} className="field-stack">
-                <span>Model</span>
+              </div>
+              <div ref={modelFieldRef} className="field-stack">
+                <span className="field-stack__label">Model</span>
                 <div className="suggest-field">
                   <input
                     className="input-shell"
                     type="text"
-                    placeholder="Orn. MT-09"
+                    placeholder={selectedBrand ? 'Orn. MT-09' : 'Once marka sec'}
                     value={formValues.model}
                     onChange={handleFieldChange('model')}
-                    onFocus={() => setActiveSuggestionField('model')}
+                    onFocus={() => {
+                      if (selectedBrand) {
+                        setActiveSuggestionField('model')
+                      }
+                    }}
                     autoComplete="off"
+                    disabled={!selectedBrand}
                   />
                   {activeSuggestionField === 'model' && visibleModelSuggestions.length ? (
                     <div className="suggest-field__panel">
@@ -442,7 +479,7 @@ function AddListing({ title, description }) {
                     </div>
                   ) : null}
                 </div>
-              </label>
+              </div>
               <label className="field-stack">
                 <span>Yil</span>
                 <input
@@ -483,8 +520,8 @@ function AddListing({ title, description }) {
                   onChange={handleFieldChange('price')}
                 />
               </label>
-              <label ref={cityFieldRef} className="field-stack">
-                <span>Sehir</span>
+              <div ref={cityFieldRef} className="field-stack">
+                <span className="field-stack__label">Sehir</span>
                 <div className="suggest-field">
                   <input
                     className="input-shell"
@@ -511,7 +548,7 @@ function AddListing({ title, description }) {
                     </div>
                   ) : null}
                 </div>
-              </label>
+              </div>
               <label className="field-stack field-stack--full">
                 <span>Plaka (istege bagli)</span>
                 <input

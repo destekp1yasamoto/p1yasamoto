@@ -5,11 +5,11 @@ function normalizeSuggestionText(value) {
   return `${value || ''}`.trim().toLocaleLowerCase('tr-TR')
 }
 
-function filterStartsWith(options, query, limit = 6) {
+function filterStartsWith(options, query, limit = 6, showAllOnEmpty = false) {
   const normalizedQuery = normalizeSuggestionText(query)
 
   if (!normalizedQuery) {
-    return []
+    return showAllOnEmpty ? options.slice(0, limit) : []
   }
 
   return options
@@ -59,7 +59,7 @@ function SearchPanel({
   )
 
   const visibleCitySuggestions = useMemo(
-    () => filterStartsWith(cityOptions, filters.city, 8),
+    () => filterStartsWith(cityOptions, filters.city, cityOptions.length, true),
     [cityOptions, filters.city],
   )
 
