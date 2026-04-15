@@ -16,13 +16,57 @@ const defaultState = {
   userListings: [],
 }
 
+function asText(value, fallback) {
+  return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+function buildSafeGallery(payload, visual) {
+  if (Array.isArray(payload.gallery) && payload.gallery.length) {
+    const galleryItems = payload.gallery.filter((item) => typeof item === 'string' && item.trim())
+
+    if (galleryItems.length) {
+      return galleryItems
+    }
+  }
+
+  return [visual]
+}
+
+function normalizeListingRecord(item) {
+  const visual = asText(item.visual, 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)')
+  const gallery = buildSafeGallery(item, visual)
+
+  return {
+    ...item,
+    title: asText(item.title, `${asText(item.brand, 'Motor')} ${asText(item.model, '')}`.trim()),
+    badge: asText(item.badge, 'İlk Eklenen'),
+    price: asText(item.price, 'Fiyat girilmedi'),
+    tag: asText(item.tag, `${asText(item.year, '2026')} Model`),
+    model: asText(item.model, 'Model'),
+    year: asText(item.year, '2026'),
+    km: asText(item.km, '0 km'),
+    city: asText(item.city, 'İstanbul'),
+    owner: asText(item.owner, 'Satıcı'),
+    brand: asText(item.brand, 'Marka'),
+    phone: asText(item.phone, 'Telefon eklenmedi'),
+    plateMasked: asText(item.plateMasked, 'Plaka yok'),
+    date: asText(item.date, formatTurkishDate()),
+    description: asText(item.description, 'Açıklama eklenmedi.'),
+    visual,
+    gallery,
+    photoCount: item.photoCount ?? item.selectedPhotos?.length ?? gallery.length,
+    selectedPhotos: Array.isArray(item.selectedPhotos) ? item.selectedPhotos : [],
+    updatedAt: item.updatedAt || 'Az önce',
+  }
+}
+
 function buildDemoUser(identifier) {
   return {
     name: 'Omer',
     identifier,
     email: 'demohesapmoto@gmail.com',
     phone: '05xx xxx xx xx',
-    city: 'Istanbul',
+    city: 'İstanbul',
     joinedAt: "Nisan 2026'dan beri",
     isDemo: true,
     verified: {
@@ -39,7 +83,17 @@ function loadState() {
 
   try {
     const rawState = window.localStorage.getItem(STORAGE_KEY)
-    return rawState ? { ...defaultState, ...JSON.parse(rawState) } : defaultState
+    if (!rawState) {
+      return defaultState
+    }
+
+    const parsedState = { ...defaultState, ...JSON.parse(rawState) }
+
+    return {
+      ...parsedState,
+      draftListings: (parsedState.draftListings || []).map(normalizeListingRecord),
+      userListings: (parsedState.userListings || []).map(normalizeListingRecord),
+    }
   } catch {
     return defaultState
   }
@@ -57,25 +111,25 @@ function buildListingRecord(payload, id) {
   return {
     id,
     title: payload.title || `${payload.brand || 'Motor'} ${payload.model || ''}`.trim(),
-    badge: payload.badge || 'Ilk Eklenen',
+    badge: payload.badge || 'İlk Eklenen',
     price: payload.price || 'Fiyat girilmedi',
     tag: payload.tag || `${year} Model`,
     model: payload.model || 'Model',
     year,
     km: payload.km || '0 km',
-    city: payload.city || 'Istanbul',
-    owner: payload.owner || 'Satici',
+    city: payload.city || 'İstanbul',
+    owner: payload.owner || 'Satıcı',
     brand: payload.brand || 'Marka',
     phone: payload.phone || 'Telefon eklenmedi',
     plate: payload.plate || '',
     plateMasked: payload.plateMasked || 'Plaka yok',
     date: payload.date || formatTurkishDate(),
-    description: payload.description || 'Aciklama eklenmedi.',
+    description: payload.description || 'Açıklama eklenmedi.',
     visual,
-    gallery: payload.gallery || [visual],
+    gallery: buildSafeGallery(payload, visual),
     photoCount: payload.selectedPhotos?.length || 0,
     selectedPhotos: payload.selectedPhotos || [],
-    updatedAt: payload.updatedAt || 'Az once',
+    updatedAt: payload.updatedAt || 'Az önce',
   }
 }
 
@@ -104,7 +158,7 @@ export function AppStateProvider({ children }) {
   const value = useMemo(
     () => ({
       ...state,
-      allListings: [...state.userListings, ...featuredBikes],
+      allListings: [...state.userListings.map(normalizeListingRecord), ...featuredBikes.map(normalizeListingRecord)],
       login(identifier) {
         setState((current) => ({
           ...current,
@@ -123,7 +177,7 @@ export function AppStateProvider({ children }) {
             identifier: payload.email || payload.phone || payload.name,
             email: payload.email || 'ornek@mail.com',
             phone: payload.phone || '05xx xxx xx xx',
-            city: payload.city || 'Istanbul',
+            city: payload.city || 'İstanbul',
             joinedAt: "Nisan 2026'dan beri",
             isDemo: false,
             verified: {

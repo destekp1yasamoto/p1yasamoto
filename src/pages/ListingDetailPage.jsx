@@ -22,6 +22,16 @@ function ListingDetailPage() {
 
   const bike = allListings.find((item) => item.id === id)
 
+  const galleryItems = useMemo(() => {
+    if (!bike) {
+      return []
+    }
+
+    return Array.isArray(bike.gallery) && bike.gallery.length
+      ? bike.gallery
+      : [bike.visual || 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)']
+  }, [bike])
+
   const relatedItems = useMemo(
     () => allListings.filter((item) => item.id !== id).slice(0, 2),
     [allListings, id],
@@ -31,6 +41,7 @@ function ListingDetailPage() {
     return <Navigate to="/" replace />
   }
 
+  const safeIndex = Math.min(activeIndex, Math.max(galleryItems.length - 1, 0))
   const isCompared = comparisons.includes(bike.id)
   const hasPendingRequest = messageRequests.some((item) => item.listingId === bike.id)
 
@@ -71,18 +82,18 @@ function ListingDetailPage() {
               <article className="detail-gallery">
                 <div
                   className="detail-gallery__image"
-                  style={{ background: bike.gallery[activeIndex] }}
+                  style={{ background: galleryItems[safeIndex] }}
                 >
                   <span className="detail-gallery__count">
-                    {activeIndex + 1}/{bike.gallery.length}
+                    {safeIndex + 1}/{galleryItems.length}
                   </span>
                 </div>
 
                 <div className="detail-gallery__dots">
-                  {bike.gallery.map((_, index) => (
+                  {galleryItems.map((_, index) => (
                     <button
                       key={index}
-                      className={`detail-gallery__dot${activeIndex === index ? ' active' : ''}`}
+                      className={`detail-gallery__dot${safeIndex === index ? ' active' : ''}`}
                       type="button"
                       onClick={() => setActiveIndex(index)}
                     />
@@ -124,7 +135,9 @@ function ListingDetailPage() {
                 </div>
 
                 <div className="detail-card__row">
-                  <span>Plaka: {bike.plateMasked} <em>(son 2 rakam gizli)</em></span>
+                  <span>
+                    Plaka: {bike.plateMasked} <em>(son 2 rakam gizli)</em>
+                  </span>
                 </div>
 
                 <div className="detail-card__row detail-card__row--between">

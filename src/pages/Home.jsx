@@ -20,6 +20,10 @@ function parseNumber(value) {
   return normalized ? Number(normalized) : null
 }
 
+function normalizeSearchText(value) {
+  return `${value || ''}`.trim().toLocaleLowerCase('tr-TR')
+}
+
 function Home() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchDraft, setSearchDraft] = useState('')
@@ -43,7 +47,8 @@ function Home() {
   }, [firstHundredListings])
 
   const filteredListings = useMemo(() => {
-    const loweredSearch = appliedSearch.trim().toLowerCase()
+    const loweredSearch = normalizeSearchText(appliedSearch)
+    const normalizedCityFilter = normalizeSearchText(appliedFilters.city)
 
     return firstHundredListings.filter((listing) => {
       const priceValue = parseNumber(listing.price)
@@ -55,11 +60,11 @@ function Home() {
       const matchesSearch = loweredSearch
         ? [listing.title, listing.brand, listing.model, listing.city]
           .filter(Boolean)
-          .some((value) => value.toLowerCase().includes(loweredSearch))
+          .some((value) => normalizeSearchText(value).includes(loweredSearch))
         : true
 
-      const matchesCity = appliedFilters.city.trim()
-        ? listing.city.toLowerCase().includes(appliedFilters.city.trim().toLowerCase())
+      const matchesCity = normalizedCityFilter
+        ? normalizeSearchText(listing.city).includes(normalizedCityFilter)
         : true
 
       const matchesMinPrice = minPrice !== null && priceValue !== null ? priceValue >= minPrice : true
