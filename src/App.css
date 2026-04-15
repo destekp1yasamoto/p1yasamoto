@@ -276,6 +276,7 @@
   min-height: 340px;
   padding: 38px 0 44px;
   border-bottom: 1px solid rgba(122, 16, 16, 0.45);
+  overflow: visible;
 }
 
 .hero-backdrop {
@@ -332,7 +333,7 @@
   position: relative;
 }
 
-.search-input__mobile-panel {
+.search-input__suggestions {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
@@ -347,7 +348,7 @@
   box-shadow: 0 20px 32px rgba(0, 0, 0, 0.34);
 }
 
-.search-input__mobile-option {
+.search-input__suggestion {
   min-height: 40px;
   padding: 0 12px;
   border: 0;
@@ -359,9 +360,12 @@
   font-size: 0.94rem;
   font-weight: 600;
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.search-input__mobile-option:hover {
+.search-input__suggestion:hover {
   background: rgba(181, 13, 13, 0.14);
 }
 
@@ -2191,7 +2195,7 @@
     grid-template-columns: minmax(0, 1fr) 84px 40px;
   }
 
-  .search-input__mobile-panel {
+  .search-input__suggestions {
     width: 100%;
   }
 

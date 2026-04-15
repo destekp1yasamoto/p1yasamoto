@@ -1,8 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FilterIcon, SearchIcon } from './Icons'
 
 function normalizeSuggestionText(value) {
   return `${value || ''}`.trim().toLocaleLowerCase('tr-TR')
+}
+
+function filterStartsWith(options, query, limit = 6) {
+  const normalizedQuery = normalizeSuggestionText(query)
+
+  if (!normalizedQuery) {
+    return []
+  }
+
+  return options
+    .filter((item) => normalizeSuggestionText(item).startsWith(normalizedQuery))
+    .slice(0, limit)
 }
 
 function SearchPanel({
@@ -18,44 +30,43 @@ function SearchPanel({
   searchQuery,
   searchSuggestions,
 }) {
-  const [isMobile, setIsMobile] = useState(false)
+  const searchFieldRef = useRef(null)
+  const cityFieldRef = useRef(null)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false)
 
   useEffect(() => {
-    const syncViewport = () => {
-      setIsMobile(window.innerWidth <= 760)
+    const handlePointerDown = (event) => {
+      if (!searchFieldRef.current?.contains(event.target)) {
+        setShowSuggestions(false)
+      }
+
+      if (!cityFieldRef.current?.contains(event.target)) {
+        setShowCitySuggestions(false)
+      }
     }
 
-    syncViewport()
-    window.addEventListener('resize', syncViewport)
+    document.addEventListener('pointerdown', handlePointerDown)
 
     return () => {
-      window.removeEventListener('resize', syncViewport)
+      document.removeEventListener('pointerdown', handlePointerDown)
     }
   }, [])
 
-  const mobileSuggestions = useMemo(() => {
-    const normalizedQuery = normalizeSuggestionText(searchQuery)
+  const visibleSuggestions = useMemo(
+    () => filterStartsWith(searchSuggestions, searchQuery, 6),
+    [searchQuery, searchSuggestions],
+  )
 
-    if (!normalizedQuery) {
-      return []
-    }
-
-    const startsWithMatches = searchSuggestions.filter((item) =>
-      normalizeSuggestionText(item).startsWith(normalizedQuery),
-    )
-    const includesMatches = searchSuggestions.filter(
-      (item) =>
-        !startsWithMatches.includes(item)
-        && normalizeSuggestionText(item).includes(normalizedQuery),
-    )
-
-    return [...startsWithMatches, ...includesMatches].slice(0, 6)
-  }, [searchQuery, searchSuggestions])
+  const visibleCitySuggestions = useMemo(
+    () => filterStartsWith(cityOptions, filters.city, 8),
+    [cityOptions, filters.city],
+  )
 
   return (
     <div className="search-shell">
       <div className="search-row">
-        <label className="search-input">
+        <label ref={searchFieldRef} className="search-input">
           <span className="search-input__icon">
             <SearchIcon />
           </span>
@@ -65,24 +76,24 @@ function SearchPanel({
             placeholder="Marka, model veya cc..."
             aria-label="İlan araması"
             value={searchQuery}
-            onChange={(event) => onSearchChange(event.target.value)}
-            list={isMobile ? undefined : 'listing-search-suggestions'}
+            onChange={(event) => {
+              onSearchChange(event.target.value)
+              setShowSuggestions(true)
+            }}
+            onFocus={() => setShowSuggestions(true)}
           />
-          {!isMobile ? (
-            <datalist id="listing-search-suggestions">
-              {searchSuggestions.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-          ) : null}
-          {isMobile && mobileSuggestions.length ? (
-            <div className="search-input__mobile-panel">
-              {mobileSuggestions.map((item) => (
+          {showSuggestions && visibleSuggestions.length ? (
+            <div className="search-input__suggestions">
+              {visibleSuggestions.map((item) => (
                 <button
                   key={item}
-                  className="search-input__mobile-option"
+                  className="search-input__suggestion"
                   type="button"
-                  onClick={() => onSearchChange(item)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onSearchChange(item)
+                    setShowSuggestions(false)
+                  }}
                 >
                   {item}
                 </button>
@@ -106,21 +117,40 @@ function SearchPanel({
       {filtersOpen ? (
         <div className="filter-panel">
           <div className="filter-grid filter-grid--five">
-            <label className="field-stack">
+            <label ref={cityFieldRef} className="field-stack">
               <span>Şehir</span>
-              <input
-                className="input-shell"
-                type="text"
-                placeholder="Tüm şehirler"
-                value={filters.city}
-                onChange={(event) => onFilterChange('city', event.target.value)}
-                list="turkey-city-list"
-              />
-              <datalist id="turkey-city-list">
-                {cityOptions.map((city) => (
-                  <option key={city} value={city} />
-                ))}
-              </datalist>
+              <div className="suggest-field">
+                <input
+                  className="input-shell"
+                  type="text"
+                  placeholder="Tüm şehirler"
+                  value={filters.city}
+                  onChange={(event) => {
+                    onFilterChange('city', event.target.value)
+                    setShowCitySuggestions(true)
+                  }}
+                  onFocus={() => setShowCitySuggestions(true)}
+                  autoComplete="off"
+                />
+                {showCitySuggestions && visibleCitySuggestions.length ? (
+                  <div className="suggest-field__panel">
+                    {visibleCitySuggestions.map((city) => (
+                      <button
+                        key={city}
+                        className={`suggest-field__option${filters.city === city ? ' is-active' : ''}`}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          onFilterChange('city', city)
+                          setShowCitySuggestions(false)
+                        }}
+                      >
+                        {city}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </label>
 
             <label className="field-stack">

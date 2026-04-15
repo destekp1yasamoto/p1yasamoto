@@ -4,7 +4,7 @@ import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import SearchPanel from '../components/SearchPanel'
 import BikeCard from '../components/BikeCard'
-import { turkeyCities } from '../data/turkeyData'
+import { popularBrands, popularModels, turkeyCities } from '../data/turkeyData'
 import { useAppState } from '../context/useAppState'
 import '../App.css'
 
@@ -37,10 +37,14 @@ function Home() {
   const remainingSlots = Math.max(0, 100 - firstHundredListings.length)
 
   const searchSuggestions = useMemo(() => {
-    const suggestionPool = firstHundredListings.flatMap((listing) => [
-      listing.brand,
-      listing.model,
-    ])
+    const suggestionPool = [
+      ...popularBrands,
+      ...popularModels,
+      ...firstHundredListings.flatMap((listing) => [
+        listing.brand,
+        listing.model,
+      ]),
+    ]
 
     return [...new Set(suggestionPool.filter(Boolean))].slice(0, 24)
   }, [firstHundredListings])

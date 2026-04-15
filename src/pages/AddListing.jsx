@@ -37,18 +37,15 @@ function formatLira(value) {
 }
 
 function filterSuggestions(options, query) {
-  const normalizedQuery = query.trim().toLowerCase()
+  const normalizedQuery = query.trim().toLocaleLowerCase('tr-TR')
 
   if (!normalizedQuery) {
     return options.slice(0, 8)
   }
 
-  const startsWithMatches = options.filter((option) => option.toLowerCase().startsWith(normalizedQuery))
-  const includesMatches = options.filter(
-    (option) => !startsWithMatches.includes(option) && option.toLowerCase().includes(normalizedQuery),
-  )
-
-  return [...startsWithMatches, ...includesMatches].slice(0, 8)
+  return options
+    .filter((option) => option.toLocaleLowerCase('tr-TR').startsWith(normalizedQuery))
+    .slice(0, 8)
 }
 
 function buildAiEstimate(formValues, aiNotes) {
@@ -118,6 +115,7 @@ function AddListing({ title, description }) {
   const photoMenuRef = useRef(null)
   const brandFieldRef = useRef(null)
   const modelFieldRef = useRef(null)
+  const cityFieldRef = useRef(null)
   const selectedPhotosRef = useRef(selectedPhotos)
   const [activeSuggestionField, setActiveSuggestionField] = useState(null)
   const [formValues, setFormValues] = useState({
@@ -141,6 +139,7 @@ function AddListing({ title, description }) {
       if (
         !brandFieldRef.current?.contains(event.target)
         && !modelFieldRef.current?.contains(event.target)
+        && !cityFieldRef.current?.contains(event.target)
       ) {
         setActiveSuggestionField(null)
       }
@@ -289,6 +288,7 @@ function AddListing({ title, description }) {
   const modelSuggestions = [...new Set([...popularModels, ...allListings.map((item) => item.model).filter(Boolean)])]
   const visibleBrandSuggestions = filterSuggestions(brandSuggestions, formValues.brand)
   const visibleModelSuggestions = filterSuggestions(modelSuggestions, formValues.model)
+  const visibleCitySuggestions = filterSuggestions(turkeyCities, formValues.city)
 
   return (
     <div className="page-shell">
@@ -483,21 +483,34 @@ function AddListing({ title, description }) {
                   onChange={handleFieldChange('price')}
                 />
               </label>
-              <label className="field-stack">
+              <label ref={cityFieldRef} className="field-stack">
                 <span>Sehir</span>
-                <input
-                  className="input-shell"
-                  type="text"
-                  placeholder="Sehir sec veya yaz"
-                  value={formValues.city}
-                  onChange={handleFieldChange('city')}
-                  list="city-suggestions"
-                />
-                <datalist id="city-suggestions">
-                  {turkeyCities.map((city) => (
-                    <option key={city} value={city} />
-                  ))}
-                </datalist>
+                <div className="suggest-field">
+                  <input
+                    className="input-shell"
+                    type="text"
+                    placeholder="Sehir sec veya yaz"
+                    value={formValues.city}
+                    onChange={handleFieldChange('city')}
+                    onFocus={() => setActiveSuggestionField('city')}
+                    autoComplete="off"
+                  />
+                  {activeSuggestionField === 'city' && visibleCitySuggestions.length ? (
+                    <div className="suggest-field__panel">
+                      {visibleCitySuggestions.map((city) => (
+                        <button
+                          key={city}
+                          className={`suggest-field__option${formValues.city === city ? ' is-active' : ''}`}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => handleSuggestionSelect('city', city)}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </label>
               <label className="field-stack field-stack--full">
                 <span>Plaka (istege bagli)</span>
