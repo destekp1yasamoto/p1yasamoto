@@ -87,6 +87,7 @@ function buildAiEstimate(formValues, aiNotes) {
   return `Yapay zeka on degerlendirmesi:
 Marka: ${formValues.brand || '-'}
 Model: ${formValues.model || '-'}
+CC: ${formValues.cc || '-'}
 Yil: ${formValues.year || '-'}
 KM: ${formValues.km || '-'}
 Sehir: ${formValues.city || '-'}
@@ -122,6 +123,7 @@ function AddListing({ title, description }) {
   const [formValues, setFormValues] = useState({
     brand: activeDraft?.brand || '',
     model: activeDraft?.model || '',
+    cc: activeDraft?.cc || '',
     year: activeDraft?.year || '',
     km: activeDraft?.km || '',
     price: activeDraft?.price || '',
@@ -251,6 +253,7 @@ function AddListing({ title, description }) {
     title: `${formValues.brand} ${formValues.model}`.trim(),
     brand: formValues.brand,
     model: formValues.model,
+    cc: formValues.cc,
     year: formValues.year,
     km: formValues.km,
     price: formValues.price,
@@ -448,6 +451,16 @@ function AddListing({ title, description }) {
                   placeholder="2024"
                   value={formValues.year}
                   onChange={handleFieldChange('year')}
+                />
+              </label>
+              <label className="field-stack">
+                <span>CC</span>
+                <input
+                  className="input-shell"
+                  type="text"
+                  placeholder="Orn. 600"
+                  value={formValues.cc}
+                  onChange={handleFieldChange('cc')}
                 />
               </label>
               <label className="field-stack">

@@ -1,6 +1,12 @@
+import { useEffect, useMemo, useState } from 'react'
 import { FilterIcon, SearchIcon } from './Icons'
 
+function normalizeSuggestionText(value) {
+  return `${value || ''}`.trim().toLocaleLowerCase('tr-TR')
+}
+
 function SearchPanel({
+  ccOptions,
   cityOptions,
   filters,
   filtersOpen,
@@ -12,6 +18,40 @@ function SearchPanel({
   searchQuery,
   searchSuggestions,
 }) {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const syncViewport = () => {
+      setIsMobile(window.innerWidth <= 760)
+    }
+
+    syncViewport()
+    window.addEventListener('resize', syncViewport)
+
+    return () => {
+      window.removeEventListener('resize', syncViewport)
+    }
+  }, [])
+
+  const mobileSuggestions = useMemo(() => {
+    const normalizedQuery = normalizeSuggestionText(searchQuery)
+
+    if (!normalizedQuery) {
+      return []
+    }
+
+    const startsWithMatches = searchSuggestions.filter((item) =>
+      normalizeSuggestionText(item).startsWith(normalizedQuery),
+    )
+    const includesMatches = searchSuggestions.filter(
+      (item) =>
+        !startsWithMatches.includes(item)
+        && normalizeSuggestionText(item).includes(normalizedQuery),
+    )
+
+    return [...startsWithMatches, ...includesMatches].slice(0, 6)
+  }, [searchQuery, searchSuggestions])
+
   return (
     <div className="search-shell">
       <div className="search-row">
@@ -22,17 +62,33 @@ function SearchPanel({
           <input
             className="input-shell input-shell--search"
             type="search"
-            placeholder="Marka, model veya anahtar kelime..."
+            placeholder="Marka, model veya cc..."
             aria-label="İlan araması"
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            list="listing-search-suggestions"
+            list={isMobile ? undefined : 'listing-search-suggestions'}
           />
-          <datalist id="listing-search-suggestions">
-            {searchSuggestions.map((item) => (
-              <option key={item} value={item} />
-            ))}
-          </datalist>
+          {!isMobile ? (
+            <datalist id="listing-search-suggestions">
+              {searchSuggestions.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+          ) : null}
+          {isMobile && mobileSuggestions.length ? (
+            <div className="search-input__mobile-panel">
+              {mobileSuggestions.map((item) => (
+                <button
+                  key={item}
+                  className="search-input__mobile-option"
+                  type="button"
+                  onClick={() => onSearchChange(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </label>
         <button className="primary-button search-row__button" type="button" onClick={onApplyFilters}>
           Ara
@@ -49,7 +105,7 @@ function SearchPanel({
 
       {filtersOpen ? (
         <div className="filter-panel">
-          <div className="filter-grid">
+          <div className="filter-grid filter-grid--five">
             <label className="field-stack">
               <span>Şehir</span>
               <input
@@ -63,6 +119,23 @@ function SearchPanel({
               <datalist id="turkey-city-list">
                 {cityOptions.map((city) => (
                   <option key={city} value={city} />
+                ))}
+              </datalist>
+            </label>
+
+            <label className="field-stack">
+              <span>CC</span>
+              <input
+                className="input-shell"
+                type="text"
+                placeholder="Tüm cc değerleri"
+                value={filters.cc}
+                onChange={(event) => onFilterChange('cc', event.target.value)}
+                list="listing-cc-list"
+              />
+              <datalist id="listing-cc-list">
+                {ccOptions.map((cc) => (
+                  <option key={cc} value={cc} />
                 ))}
               </datalist>
             </label>

@@ -10,6 +10,7 @@ import '../App.css'
 
 const initialFilters = {
   city: '',
+  cc: '',
   priceMin: '',
   priceMax: '',
   kmMax: '',
@@ -39,11 +40,15 @@ function Home() {
     const suggestionPool = firstHundredListings.flatMap((listing) => [
       listing.brand,
       listing.model,
-      listing.title,
-      listing.city,
     ])
 
     return [...new Set(suggestionPool.filter(Boolean))].slice(0, 24)
+  }, [firstHundredListings])
+
+  const ccOptions = useMemo(() => {
+    return [...new Set(firstHundredListings.map((listing) => listing.cc).filter(Boolean))]
+      .sort((left, right) => Number(left) - Number(right))
+      .slice(0, 40)
   }, [firstHundredListings])
 
   const filteredListings = useMemo(() => {
@@ -56,9 +61,10 @@ function Home() {
       const minPrice = parseNumber(appliedFilters.priceMin)
       const maxPrice = parseNumber(appliedFilters.priceMax)
       const maxKm = parseNumber(appliedFilters.kmMax)
+      const normalizedCcFilter = normalizeSearchText(appliedFilters.cc)
 
       const matchesSearch = loweredSearch
-        ? [listing.title, listing.brand, listing.model, listing.city]
+        ? [listing.title, listing.brand, listing.model, listing.cc]
           .filter(Boolean)
           .some((value) => normalizeSearchText(value).includes(loweredSearch))
         : true
@@ -66,12 +72,15 @@ function Home() {
       const matchesCity = normalizedCityFilter
         ? normalizeSearchText(listing.city).includes(normalizedCityFilter)
         : true
+      const matchesCc = normalizedCcFilter
+        ? normalizeSearchText(listing.cc).includes(normalizedCcFilter)
+        : true
 
       const matchesMinPrice = minPrice !== null && priceValue !== null ? priceValue >= minPrice : true
       const matchesMaxPrice = maxPrice !== null && priceValue !== null ? priceValue <= maxPrice : true
       const matchesMaxKm = maxKm !== null && kmValue !== null ? kmValue <= maxKm : true
 
-      return matchesSearch && matchesCity && matchesMinPrice && matchesMaxPrice && matchesMaxKm
+      return matchesSearch && matchesCity && matchesCc && matchesMinPrice && matchesMaxPrice && matchesMaxKm
     })
   }, [appliedFilters, appliedSearch, firstHundredListings])
 
@@ -107,6 +116,7 @@ function Home() {
             </h1>
             <p>Binlerce motosiklet ilanı — satın al, sat, karşılaştır.</p>
             <SearchPanel
+              ccOptions={ccOptions}
               cityOptions={turkeyCities}
               filters={filtersDraft}
               filtersOpen={filtersOpen}
