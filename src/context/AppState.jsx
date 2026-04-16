@@ -4,6 +4,7 @@ import { featuredBikes } from '../data/featuredBikes'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 
 const STORAGE_KEY = 'p1yasamoto-ui-state'
+const configuredSiteUrl = `${import.meta.env.VITE_SITE_URL || ''}`.trim().replace(/\/+$/, '')
 
 const defaultUiState = {
   favorites: [],
@@ -151,6 +152,18 @@ function normalizePhone(value) {
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(`${email || ''}`.trim())
+}
+
+function getAppBaseUrl() {
+  if (configuredSiteUrl) {
+    return configuredSiteUrl
+  }
+
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+
+  return ''
 }
 
 function buildFallbackProfile(authUser) {
@@ -400,6 +413,8 @@ export function AppStateProvider({ children }) {
           throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
         }
 
+        const appBaseUrl = getAppBaseUrl()
+
         const name = `${payload.name || ''}`.trim()
         const email = `${payload.email || ''}`.trim().toLowerCase()
         const phone = normalizePhone(payload.phone)
@@ -426,7 +441,7 @@ export function AppStateProvider({ children }) {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/giris?verified=1`,
+            emailRedirectTo: `${appBaseUrl}/giris?verified=1`,
             data: {
               username: name,
               full_name: name,
@@ -449,10 +464,12 @@ export function AppStateProvider({ children }) {
           throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
         }
 
+        const appBaseUrl = getAppBaseUrl()
+
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: `${window.location.origin}/profil`,
+            redirectTo: `${appBaseUrl}/profil`,
           },
         })
 
@@ -465,6 +482,8 @@ export function AppStateProvider({ children }) {
           throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
         }
 
+        const appBaseUrl = getAppBaseUrl()
+
         const targetEmail = email || session?.user?.email
 
         if (!targetEmail) {
@@ -475,7 +494,7 @@ export function AppStateProvider({ children }) {
           type: 'signup',
           email: targetEmail,
           options: {
-            emailRedirectTo: `${window.location.origin}/giris?verified=1`,
+            emailRedirectTo: `${appBaseUrl}/giris?verified=1`,
           },
         })
 
@@ -488,9 +507,11 @@ export function AppStateProvider({ children }) {
           throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
         }
 
+        const appBaseUrl = getAppBaseUrl()
+
         const email = await resolveLoginEmail(identifier)
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/sifre-sifirla`,
+          redirectTo: `${appBaseUrl}/sifre-sifirla`,
         })
 
         if (error) {
