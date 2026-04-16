@@ -9,6 +9,7 @@ function ForgotPasswordPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { authConfigured, sendPasswordReset, session, updatePassword } = useAppState()
+
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -73,10 +74,10 @@ function ForgotPasswordPage() {
 
       <main className="auth-page">
         <form className="auth-card" onSubmit={isRecoveryMode ? handlePasswordUpdate : handleResetRequest}>
-          <h1>{isRecoveryMode ? 'Yeni Şifre Belirle' : 'Şifremi Unuttum'}</h1>
+          <h1>{isRecoveryMode ? 'Yeni Şifre Oluştur' : 'Şifremi Unuttum'}</h1>
           <p>
             {isRecoveryMode
-              ? 'Mailden gelen güvenli bağlantı ile yeni şifreni oluştur.'
+              ? 'Mailden gelen güvenli bağlantı ile yeni şifreni oluştur ya da giriş ekranına dön.'
               : 'Mail, kullanıcı adı ya da telefon yazarak şifre sıfırlama bağlantısı iste.'}
           </p>
 
@@ -124,15 +125,11 @@ function ForgotPasswordPage() {
           )}
 
           <button className="primary-button auth-card__submit" type="submit" disabled={isSubmitting || !authConfigured}>
-            {isSubmitting
-              ? 'İşleniyor...'
-              : isRecoveryMode
-                ? 'Şifreyi Güncelle'
-                : 'Sıfırlama Linki Gönder'}
+            {isSubmitting ? 'İşleniyor...' : isRecoveryMode ? 'Şifreyi Güncelle' : 'Sıfırlama Linki Gönder'}
           </button>
 
           <p className="auth-card__switch">
-            <Link to="/giris">Giriş ekranına dön</Link>
+            <Link to="/giris">Giriş Yap</Link>
           </p>
         </form>
       </main>
