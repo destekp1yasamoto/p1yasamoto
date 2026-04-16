@@ -573,6 +573,33 @@ export function AppStateProvider({ children }) {
         setProfile(nextProfile)
         return nextProfile
       },
+      async submitSupportMessage(payload) {
+        if (!supabase || !session?.user || !user) {
+          throw new Error('Mesaj göndermek için önce hesabına giriş yapman gerekiyor.')
+        }
+
+        const message = `${payload.message || ''}`.trim()
+        const subject = `${payload.subject || ''}`.trim()
+        const rating = `${payload.rating || ''}`.trim()
+
+        if (!message) {
+          throw new Error('Mesaj alanı boş bırakılamaz.')
+        }
+
+        const { error } = await supabase.from('support_messages').insert({
+          user_id: session.user.id,
+          kind: payload.kind,
+          name_snapshot: user.name,
+          email_snapshot: user.email,
+          subject: subject || null,
+          message,
+          rating: rating || null,
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      },
       async logout() {
         if (!supabase) {
           setSession(null)

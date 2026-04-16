@@ -13,6 +13,18 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.support_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  kind text not null check (kind in ('contact', 'rating')),
+  name_snapshot text,
+  email_snapshot text,
+  subject text,
+  message text not null,
+  rating text,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -69,6 +81,7 @@ create trigger set_profile_updated_at
   for each row execute procedure public.touch_profile_updated_at();
 
 alter table public.profiles enable row level security;
+alter table public.support_messages enable row level security;
 
 drop policy if exists "Users can read own profile" on public.profiles;
 create policy "Users can read own profile"
@@ -87,6 +100,18 @@ create policy "Users can update own profile"
   on public.profiles
   for update
   using (auth.uid() = id);
+
+drop policy if exists "Users can insert own support messages" on public.support_messages;
+create policy "Users can insert own support messages"
+  on public.support_messages
+  for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can read own support messages" on public.support_messages;
+create policy "Users can read own support messages"
+  on public.support_messages
+  for select
+  using (auth.uid() = user_id);
 
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)

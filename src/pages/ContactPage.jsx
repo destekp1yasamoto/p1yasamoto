@@ -1,9 +1,9 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
+import { useAppState } from '../context/useAppState'
 import '../App.css'
-
-const SUPPORT_EMAIL = 'destekp1yasamoto@gmail.com'
 
 const ratingOptions = [
   { id: 'kotu', emoji: '😞', label: 'Kötü' },
@@ -12,27 +12,18 @@ const ratingOptions = [
   { id: 'cok-iyi', emoji: '🤩', label: 'Çok İyi' },
 ]
 
-function buildMailtoLink({ subject, body }) {
-  const params = new URLSearchParams({
-    subject,
-    body,
-  })
-
-  return `mailto:${SUPPORT_EMAIL}?${params.toString()}`
-}
-
 function ContactPage() {
+  const { authConfigured, isAuthenticated, submitSupportMessage, user } = useAppState()
+
   const [contactForm, setContactForm] = useState({
-    name: '',
-    email: '',
     subject: '',
     message: '',
   })
-  const [contactFeedback, setContactFeedback] = useState('')
+  const [contactFeedback, setContactFeedback] = useState({ error: '', success: '' })
 
   const [rating, setRating] = useState('iyi')
   const [ratingMessage, setRatingMessage] = useState('')
-  const [ratingFeedback, setRatingFeedback] = useState('')
+  const [ratingFeedback, setRatingFeedback] = useState({ error: '', success: '' })
 
   const updateContactField = (field) => (event) => {
     setContactForm((current) => ({
@@ -41,36 +32,73 @@ function ContactPage() {
     }))
   }
 
-  const handleContactSubmit = (event) => {
+  const requireAuthMessage = 'Mesaj göndermek için önce hesabına giriş yapmalısın.'
+  const contactName = user?.name || ''
+  const contactEmail = user?.email || ''
+
+  const handleContactSubmit = async (event) => {
     event.preventDefault()
+    setContactFeedback({ error: '', success: '' })
 
-    const subject = contactForm.subject?.trim() || 'P1yasaMoto İletişim Mesajı'
-    const body = [
-      `Ad: ${contactForm.name || '-'}`,
-      `Mail: ${contactForm.email || '-'}`,
-      '',
-      'Mesaj:',
-      contactForm.message || '-',
-    ].join('\n')
+    if (!isAuthenticated) {
+      setContactFeedback({ error: requireAuthMessage, success: '' })
+      return
+    }
 
-    window.location.href = buildMailtoLink({ subject, body })
-    setContactFeedback('Varsayılan mail uygulaman açılıyor. Mesaj hazır şekilde destek adresine yönlendirildi.')
+    try {
+      await submitSupportMessage({
+        kind: 'contact',
+        subject: contactForm.subject.trim() || 'P1yasaMoto İletişim Mesajı',
+        message: contactForm.message,
+      })
+
+      setContactFeedback({
+        error: '',
+        success: 'Mesajın başarıyla iletildi. Artık mail uygulamasına yönlendirilmiyorsun.',
+      })
+      setContactForm((current) => ({
+        ...current,
+        subject: '',
+        message: '',
+      }))
+    } catch (error) {
+      setContactFeedback({
+        error: error.message || 'Mesaj gönderilirken bir sorun oluştu.',
+        success: '',
+      })
+    }
   }
 
-  const handleRatingSubmit = (event) => {
+  const handleRatingSubmit = async (event) => {
     event.preventDefault()
+    setRatingFeedback({ error: '', success: '' })
+
+    if (!isAuthenticated) {
+      setRatingFeedback({ error: requireAuthMessage, success: '' })
+      return
+    }
 
     const selectedRating = ratingOptions.find((item) => item.id === rating)
-    const subject = `P1yasaMoto Site Puanlama - ${selectedRating?.label || 'Geri Bildirim'}`
-    const body = [
-      `Puan: ${selectedRating?.emoji || ''} ${selectedRating?.label || '-'}`,
-      '',
-      'Açıklama / Öneri:',
-      ratingMessage || '-',
-    ].join('\n')
 
-    window.location.href = buildMailtoLink({ subject, body })
-    setRatingFeedback('Puanlama maili hazırlıkla açıldı. İstersen metni kontrol edip doğrudan gönderebilirsin.')
+    try {
+      await submitSupportMessage({
+        kind: 'rating',
+        subject: `Site puanlama - ${selectedRating?.label || 'Geri Bildirim'}`,
+        message: ratingMessage,
+        rating: selectedRating?.label || '',
+      })
+
+      setRatingFeedback({
+        error: '',
+        success: 'Puanlaman kaydedildi. Geri bildirimin destek paneline düştü.',
+      })
+      setRatingMessage('')
+    } catch (error) {
+      setRatingFeedback({
+        error: error.message || 'Puanlama gönderilirken bir sorun oluştu.',
+        success: '',
+      })
+    }
   }
 
   return (
@@ -81,8 +109,35 @@ function ContactPage() {
         <section className="contact-page">
           <div className="contact-header">
             <h1>İletişim & Geri Bildirim</h1>
-            <p>Sorularınızı ve görüşlerinizi bizimle paylaşın.</p>
+            <p>Sorularını ve görüşlerini bize doğrudan panel üzerinden iletebilirsin.</p>
           </div>
+
+          {!authConfigured ? (
+            <article className="contact-card">
+              <h2>Bağlantı Eksik</h2>
+              <p className="field-note">
+                İletişim mesajlarını doğrudan sisteme kaydetmek için Supabase bağlantısının aktif olması gerekiyor.
+              </p>
+            </article>
+          ) : null}
+
+          {!isAuthenticated ? (
+            <article className="contact-card">
+              <h2>Önce Giriş Yap</h2>
+              <p className="field-note">
+                İletişim mesajları ve site puanlamaları artık doğrudan hesabın üzerinden kaydediliyor. Bu yüzden
+                mesaj göndermek için önce hesabına giriş yapman gerekiyor.
+              </p>
+              <div className="filter-actions">
+                <Link className="primary-button" to="/giris">
+                  Giriş Yap
+                </Link>
+                <Link className="ghost-button" to="/kayit-ol">
+                  Hesap Oluştur
+                </Link>
+              </div>
+            </article>
+          ) : null}
 
           <article className="contact-card">
             <h2>İletişim Formu</h2>
@@ -90,48 +145,40 @@ function ContactPage() {
               <div className="form-grid">
                 <label className="field-stack">
                   <span>Ad</span>
-                  <input
-                    className="input-shell"
-                    type="text"
-                    placeholder="Adınız"
-                    value={contactForm.name}
-                    onChange={updateContactField('name')}
-                  />
+                  <input className="input-shell" type="text" value={contactName} readOnly />
                 </label>
+
                 <label className="field-stack">
                   <span>Email</span>
-                  <input
-                    className="input-shell"
-                    type="email"
-                    placeholder="email@ornek.com"
-                    value={contactForm.email}
-                    onChange={updateContactField('email')}
-                  />
+                  <input className="input-shell" type="email" value={contactEmail} readOnly />
                 </label>
+
                 <label className="field-stack field-stack--full">
                   <span>Konu</span>
                   <input
                     className="input-shell"
                     type="text"
-                    placeholder="Mesajınızın konusu"
+                    placeholder="Mesajının konusu"
                     value={contactForm.subject}
                     onChange={updateContactField('subject')}
                   />
                 </label>
+
                 <label className="field-stack field-stack--full">
                   <span>Mesaj</span>
                   <textarea
                     className="textarea-shell"
-                    placeholder="Mesajınızı buraya yazın..."
+                    placeholder="Mesajını buraya yaz..."
                     value={contactForm.message}
                     onChange={updateContactField('message')}
                   />
                 </label>
               </div>
 
-              {contactFeedback ? <p className="form-success">{contactFeedback}</p> : null}
+              {contactFeedback.error ? <p className="form-error">{contactFeedback.error}</p> : null}
+              {contactFeedback.success ? <p className="form-success">{contactFeedback.success}</p> : null}
 
-              <button className="primary-button contact-card__button" type="submit">
+              <button className="primary-button contact-card__button" type="submit" disabled={!authConfigured}>
                 Gönder
               </button>
             </form>
@@ -139,7 +186,7 @@ function ContactPage() {
 
           <article className="contact-card">
             <h2>Site Puanlama</h2>
-            <p className="field-note">Sitede neler daha iyi olabilir, hangi bölüm geliştirilmeli bize yaz.</p>
+            <p className="field-note">Sitede neleri geliştirmemizi istediğini kısa notla bize ilet.</p>
 
             <form onSubmit={handleRatingSubmit}>
               <div className="rating-grid">
@@ -150,7 +197,9 @@ function ContactPage() {
                     type="button"
                     onClick={() => setRating(item.id)}
                   >
-                    <span className="rating-option__emoji" aria-hidden="true">{item.emoji}</span>
+                    <span className="rating-option__emoji" aria-hidden="true">
+                      {item.emoji}
+                    </span>
                     <span>{item.label}</span>
                   </button>
                 ))}
@@ -160,15 +209,16 @@ function ContactPage() {
                 <span>Açıklama / Metin</span>
                 <textarea
                   className="textarea-shell"
-                  placeholder="Şurada şu olabilir, bu bölüm şöyle geliştirilebilir, mobilde şunu iyileştirebiliriz..."
+                  placeholder="Burada şu özellik olabilir, mobilde şu alan geliştirilebilir, tasarımda bunu güçlendirebiliriz..."
                   value={ratingMessage}
                   onChange={(event) => setRatingMessage(event.target.value)}
                 />
               </label>
 
-              {ratingFeedback ? <p className="form-success">{ratingFeedback}</p> : null}
+              {ratingFeedback.error ? <p className="form-error">{ratingFeedback.error}</p> : null}
+              {ratingFeedback.success ? <p className="form-success">{ratingFeedback.success}</p> : null}
 
-              <button className="primary-button contact-card__button" type="submit">
+              <button className="primary-button contact-card__button" type="submit" disabled={!authConfigured}>
                 Puanlamayı Gönder
               </button>
             </form>
