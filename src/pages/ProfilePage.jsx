@@ -9,6 +9,14 @@ import '../App.css'
 function ProfilePage() {
   const location = useLocation()
   const [selectedTab, setSelectedTab] = useState('ilanlar')
+  const [profileForm, setProfileForm] = useState({
+    username: '',
+    phone: '',
+    city: '',
+  })
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [feedback, setFeedback] = useState({ error: '', success: '' })
+  const [isSaving, setIsSaving] = useState(false)
   const {
     activeChats,
     allListings,
@@ -18,9 +26,20 @@ function ProfilePage() {
     messageRequests,
     notifications,
     publishDraftListing,
+    refreshProfile,
+    resendVerificationEmail,
+    updateProfile,
     user,
     userListings,
   } = useAppState()
+
+  useEffect(() => {
+    setProfileForm({
+      username: user?.username || user?.name || '',
+      phone: user?.phone || '',
+      city: user?.city || 'İstanbul',
+    })
+  }, [user?.city, user?.name, user?.phone, user?.username])
 
   const demoListings = useMemo(
     () => (user?.isDemo ? featuredBikes.filter((bike) => bike.owner === 'Ömer').slice(0, 2) : []),
@@ -50,6 +69,57 @@ function ProfilePage() {
     }
   }, [activeTab, markNotificationsRead])
 
+  const handleProfileField = (field) => (event) => {
+    setProfileForm((current) => ({
+      ...current,
+      [field]: event.target.value,
+    }))
+  }
+
+  const handleProfileSave = async () => {
+    setFeedback({ error: '', success: '' })
+    setIsSaving(true)
+
+    try {
+      await updateProfile({
+        username: profileForm.username,
+        phone: profileForm.phone,
+        city: profileForm.city,
+        avatarFile,
+      })
+      await refreshProfile()
+      setAvatarFile(null)
+      setFeedback({
+        error: '',
+        success: 'Profil bilgileri kaydedildi. Telefon değiştiyse doğrulama durumu sıfırlandı.',
+      })
+    } catch (error) {
+      setFeedback({
+        error: error.message || 'Profil kaydedilirken bir sorun oluştu.',
+        success: '',
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleVerificationMail = async () => {
+    setFeedback({ error: '', success: '' })
+
+    try {
+      await resendVerificationEmail(user?.email)
+      setFeedback({
+        error: '',
+        success: 'Mail doğrulama bağlantısı tekrar gönderildi.',
+      })
+    } catch (error) {
+      setFeedback({
+        error: error.message || 'Doğrulama maili gönderilemedi.',
+        success: '',
+      })
+    }
+  }
+
   return (
     <div className="page-shell">
       <Navbar />
@@ -58,12 +128,16 @@ function ProfilePage() {
         <section className="profile-hub">
           <article className="profile-summary">
             <div className="profile-summary__identity">
-              <span className="profile-summary__avatar">
-                {(user?.name || 'O').charAt(0)}
+              <span className="profile-summary__avatar profile-summary__avatar--image">
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt={user.name} />
+                ) : (
+                  (user?.name || 'K').charAt(0)
+                )}
               </span>
               <div>
-                <strong>{user?.name || 'Omer'}</strong>
-                <p>{user?.email || 'demohesapmoto@gmail.com'}</p>
+                <strong>{user?.name || 'Kullanıcı'}</strong>
+                <p>{user?.email || 'mail@yok.com'}</p>
                 <span>{user?.joinedAt || "Nisan 2026'dan beri"}</span>
               </div>
             </div>
@@ -98,10 +172,7 @@ function ProfilePage() {
                 <div className="profile-list">
                   {ownedListings.map((bike) => (
                     <article key={bike.id} className="profile-listing">
-                      <div
-                        className="profile-listing__thumb"
-                        style={{ background: bike.visual }}
-                      />
+                      <div className="profile-listing__thumb" style={{ background: bike.visual }} />
                       <div className="profile-listing__content">
                         <strong>{bike.title}</strong>
                         <p>{bike.price}</p>
@@ -132,10 +203,7 @@ function ProfilePage() {
                   <div className="profile-list">
                     {draftListings.map((draft) => (
                       <article key={draft.id} className="profile-listing profile-listing--draft">
-                        <div
-                          className="profile-listing__thumb"
-                          style={{ background: draft.visual }}
-                        />
+                        <div className="profile-listing__thumb" style={{ background: draft.visual }} />
                         <div className="profile-listing__content">
                           <strong>{draft.title || 'Taslak ilan'}</strong>
                           <p>{draft.price}</p>
@@ -171,10 +239,7 @@ function ProfilePage() {
               <div className="profile-list">
                 {favoriteItems.map((bike) => (
                   <article key={bike.id} className="profile-listing">
-                    <div
-                      className="profile-listing__thumb"
-                      style={{ background: bike.visual }}
-                    />
+                    <div className="profile-listing__thumb" style={{ background: bike.visual }} />
                     <div className="profile-listing__content">
                       <strong>{bike.title}</strong>
                       <p>{bike.price}</p>
@@ -183,9 +248,6 @@ function ProfilePage() {
                     <div className="profile-listing__actions">
                       <button className="ghost-button" type="button">
                         Karşılaştır
-                      </button>
-                      <button className="ghost-button ghost-button--danger" type="button">
-                        Çıkar
                       </button>
                     </div>
                   </article>
@@ -256,27 +318,61 @@ function ProfilePage() {
             <section className="profile-stack">
               <article className="profile-panel">
                 <h2>Profil Bilgileri</h2>
+
+                {feedback.error ? <p className="form-error">{feedback.error}</p> : null}
+                {feedback.success ? <p className="form-success">{feedback.success}</p> : null}
+
+                <div className="profile-avatar-picker">
+                  <div className="profile-avatar-picker__preview">
+                    {user?.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.name} />
+                    ) : (
+                      (user?.name || 'K').charAt(0)
+                    )}
+                  </div>
+                  <label className="ghost-button profile-avatar-picker__button">
+                    Profil Fotoğrafı Seç
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => setAvatarFile(event.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
+
                 <div className="form-grid">
+                  <label className="field-stack">
+                    <span>Kullanıcı Adı</span>
+                    <input
+                      className="input-shell"
+                      type="text"
+                      value={profileForm.username}
+                      onChange={handleProfileField('username')}
+                    />
+                  </label>
                   <label className="field-stack">
                     <span>Telefon</span>
                     <input
                       className="input-shell"
                       type="text"
-                      defaultValue={user?.phone || '05xx xxx xx xx'}
+                      value={profileForm.phone}
+                      onChange={handleProfileField('phone')}
                     />
                   </label>
-                  <label className="field-stack">
+                  <label className="field-stack field-stack--full">
                     <span>Şehir / Konum</span>
                     <input
                       className="input-shell"
                       type="text"
-                      defaultValue={user?.city || 'İstanbul'}
+                      value={profileForm.city}
+                      onChange={handleProfileField('city')}
                     />
                   </label>
                 </div>
+
                 <div className="filter-actions">
-                  <button className="primary-button" type="button">
-                    Kaydet
+                  <button className="primary-button" type="button" onClick={handleProfileSave} disabled={isSaving}>
+                    {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
                   </button>
                 </div>
               </article>
@@ -287,17 +383,21 @@ function ProfilePage() {
                   <div className="verification-item">
                     <div>
                       <strong>Telefon</strong>
-                      <span>{user?.phone || '05xx xxx xx xx'} · Doğrulanmamış</span>
+                      <span>
+                        {user?.phone || 'Telefon eklenmedi'} · {user?.verified.phone ? 'Doğrulandı' : 'Doğrulanmadı'}
+                      </span>
                     </div>
                   </div>
                   <div className="verification-item verification-item--action">
                     <div>
-                      <strong>{user?.email || 'demohesapmoto@gmail.com'}</strong>
-                      <span>Doğrulanmamış</span>
+                      <strong>{user?.email || 'mail@yok.com'}</strong>
+                      <span>{user?.verified.email ? 'Doğrulandı' : 'Doğrulanmadı'}</span>
                     </div>
-                    <button className="primary-button verification-item__button" type="button">
-                      Doğrula
-                    </button>
+                    {!user?.verified.email ? (
+                      <button className="primary-button verification-item__button" type="button" onClick={handleVerificationMail}>
+                        Doğrulama Maili Gönder
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </article>

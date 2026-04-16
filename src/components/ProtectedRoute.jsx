@@ -3,10 +3,14 @@ import { useAppState } from '../context/useAppState'
 
 function ProtectedRoute({ children }) {
   const location = useLocation()
-  const { isAuthenticated } = useAppState()
+  const { authReady, isAuthenticated } = useAppState()
+
+  if (!authReady) {
+    return null
+  }
 
   if (!isAuthenticated) {
-    return <Navigate to="/kayit-ol" replace state={{ from: location.pathname }} />
+    return <Navigate to="/giris" replace state={{ from: location.pathname }} />
   }
 
   return children

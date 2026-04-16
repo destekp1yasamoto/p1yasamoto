@@ -108,3 +108,29 @@ export function BikeLogoIcon() {
     </svg>
   )
 }
+
+export function StarIcon({ filled = false }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path
+        d="M12 3.8L14.6 9.1L20.4 9.9L16.2 14L17.2 19.8L12 17L6.8 19.8L7.8 14L3.6 9.9L9.4 9.1L12 3.8Z"
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function TrashIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M5.5 7.5H18.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9 7.5V5.8A1.8 1.8 0 0 1 10.8 4H13.2A1.8 1.8 0 0 1 15 5.8V7.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7.2 7.5L8 19A1.8 1.8 0 0 0 9.8 20.6H14.2A1.8 1.8 0 0 0 16 19L16.8 7.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 11V16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M14 11V16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}

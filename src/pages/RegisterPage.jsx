@@ -13,17 +13,42 @@ function RegisterPage() {
     password: '',
     confirmPassword: '',
   })
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
-  const { register } = useAppState()
+  const { authConfigured, register, signInWithGoogle } = useAppState()
 
   const updateField = (field) => (event) => {
     setForm((current) => ({ ...current, [field]: event.target.value }))
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    register(form)
-    navigate('/profil')
+    setErrorMessage('')
+    setIsSubmitting(true)
+
+    try {
+      const result = await register(form)
+      navigate('/giris', {
+        state: {
+          verificationEmail: result.email,
+        },
+      })
+    } catch (error) {
+      setErrorMessage(error.message || 'Kayıt sırasında bir sorun oluştu.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleGoogleRegister = async () => {
+    setErrorMessage('')
+
+    try {
+      await signInWithGoogle()
+    } catch (error) {
+      setErrorMessage(error.message || 'Google ile kayıt başlatılamadı.')
+    }
   }
 
   return (
@@ -33,7 +58,15 @@ function RegisterPage() {
       <main className="auth-page">
         <form className="auth-card" onSubmit={handleSubmit}>
           <h1>Kayıt Ol</h1>
-          <p>Ücretsiz hesap oluştur, ilan ver.</p>
+          <p>Gerçek hesap oluştur, mailini doğrula ve ilanlarını hesabına bağlı yönet.</p>
+
+          {!authConfigured ? (
+            <div className="auth-card__alert auth-card__alert--warning">
+              Supabase ayarları eksik. Önce `.env` dosyasına `VITE_SUPABASE_URL` ve `VITE_SUPABASE_ANON_KEY` eklenmeli.
+            </div>
+          ) : null}
+
+          {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
 
           <label className="field-stack">
             <span>İsim / Kullanıcı Adı</span>
@@ -76,6 +109,7 @@ function RegisterPage() {
               placeholder="En az 6 karakter"
               value={form.password}
               onChange={updateField('password')}
+              autoComplete="new-password"
             />
           </label>
 
@@ -87,11 +121,16 @@ function RegisterPage() {
               placeholder="Şifreni tekrar gir"
               value={form.confirmPassword}
               onChange={updateField('confirmPassword')}
+              autoComplete="new-password"
             />
           </label>
 
-          <button className="primary-button auth-card__submit" type="submit">
-            Hesap Oluştur
+          <button className="primary-button auth-card__submit" type="submit" disabled={isSubmitting || !authConfigured}>
+            {isSubmitting ? 'Hesap Oluşturuluyor...' : 'Hesap Oluştur'}
+          </button>
+
+          <button className="ghost-button auth-card__submit" type="button" onClick={handleGoogleRegister} disabled={!authConfigured}>
+            Google ile Kayıt Ol
           </button>
 
           <p className="auth-card__switch">

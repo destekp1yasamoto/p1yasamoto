@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppStateContext } from './AppStateContext'
 import { featuredBikes } from '../data/featuredBikes'
+import { isSupabaseConfigured, supabase } from '../lib/supabase'
 
-const STORAGE_KEY = 'p1yasamoto-app-state'
+const STORAGE_KEY = 'p1yasamoto-ui-state'
 
-const defaultState = {
-  isAuthenticated: false,
-  user: null,
+const defaultUiState = {
   favorites: [],
   comparisons: [],
   messageRequests: [],
@@ -30,6 +29,20 @@ function buildSafeGallery(payload, visual) {
   }
 
   return [visual]
+}
+
+function formatTurkishDate() {
+  const today = new Date()
+  return `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`
+}
+
+function formatJoinedAt(dateString) {
+  const date = dateString ? new Date(dateString) : new Date()
+
+  return new Intl.DateTimeFormat('tr-TR', {
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
 }
 
 function normalizeListingRecord(item) {
@@ -61,51 +74,7 @@ function normalizeListingRecord(item) {
   }
 }
 
-function buildDemoUser(identifier) {
-  return {
-    name: 'Omer',
-    identifier,
-    email: 'demohesapmoto@gmail.com',
-    phone: '05xx xxx xx xx',
-    city: 'İstanbul',
-    joinedAt: "Nisan 2026'dan beri",
-    isDemo: true,
-    verified: {
-      email: false,
-      phone: false,
-    },
-  }
-}
-
-function loadState() {
-  if (typeof window === 'undefined') {
-    return defaultState
-  }
-
-  try {
-    const rawState = window.localStorage.getItem(STORAGE_KEY)
-    if (!rawState) {
-      return defaultState
-    }
-
-    const parsedState = { ...defaultState, ...JSON.parse(rawState) }
-
-    return {
-      ...parsedState,
-      draftListings: (parsedState.draftListings || []).map(normalizeListingRecord),
-      userListings: (parsedState.userListings || []).map(normalizeListingRecord),
-    }
-  } catch {
-    return defaultState
-  }
-}
-
-function formatTurkishDate() {
-  const today = new Date()
-  return `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`
-}
-
-function buildListingRecord(payload, id) {
+function buildListingRecord(payload, id, ownerName, ownerPhone) {
   const visual = payload.visual || 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)'
   const year = payload.year || '2026'
 
@@ -120,9 +89,9 @@ function buildListingRecord(payload, id) {
     year,
     km: payload.km || '0 km',
     city: payload.city || 'İstanbul',
-    owner: payload.owner || 'Satıcı',
+    owner: payload.owner || ownerName || 'Satıcı',
     brand: payload.brand || 'Marka',
-    phone: payload.phone || 'Telefon eklenmedi',
+    phone: payload.phone || ownerPhone || 'Telefon eklenmedi',
     plate: payload.plate || '',
     plateMasked: payload.plateMasked || 'Plaka yok',
     date: payload.date || formatTurkishDate(),
@@ -135,65 +104,490 @@ function buildListingRecord(payload, id) {
   }
 }
 
-function sanitizeState(state) {
+function sanitizeUiState(state) {
   const builtInIds = featuredBikes.map((item) => item.id)
   const userListingIds = (state.userListings || []).map((item) => item.id)
   const validListingIds = new Set([...builtInIds, ...userListingIds])
 
   return {
     ...state,
+    draftListings: (state.draftListings || []).map(normalizeListingRecord),
+    userListings: (state.userListings || []).map(normalizeListingRecord),
     favorites: (state.favorites || []).filter((id) => validListingIds.has(id)),
     comparisons: (state.comparisons || []).filter((id) => validListingIds.has(id)),
-    messageRequests: (state.messageRequests || []).filter((item) =>
-      validListingIds.has(item.listingId),
-    ),
+    messageRequests: (state.messageRequests || []).filter((item) => validListingIds.has(item.listingId)),
+  }
+}
+
+function loadUiState() {
+  if (typeof window === 'undefined') {
+    return defaultUiState
+  }
+
+  try {
+    const rawState = window.localStorage.getItem(STORAGE_KEY)
+    if (!rawState) {
+      return defaultUiState
+    }
+
+    return sanitizeUiState({ ...defaultUiState, ...JSON.parse(rawState) })
+  } catch {
+    return defaultUiState
+  }
+}
+
+function persistUiState(uiState) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(uiState))
+}
+
+function normalizePhone(value) {
+  const digits = `${value || ''}`.replace(/[^\d+]/g, '')
+  return digits || null
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(`${email || ''}`.trim())
+}
+
+function buildFallbackProfile(authUser) {
+  const metadata = authUser?.user_metadata || {}
+  const username = metadata.username || metadata.full_name || authUser?.email?.split('@')[0] || 'Kullanıcı'
+
+  return {
+    id: authUser?.id,
+    email: authUser?.email || '',
+    username,
+    full_name: metadata.full_name || username,
+    phone: metadata.phone || '',
+    city: metadata.city || 'İstanbul',
+    avatar_url: metadata.avatar_url || '',
+    phone_verified: false,
+    created_at: authUser?.created_at || new Date().toISOString(),
+  }
+}
+
+function buildUserViewModel(authUser, profile) {
+  if (!authUser) {
+    return null
+  }
+
+  const safeProfile = profile || buildFallbackProfile(authUser)
+
+  return {
+    id: authUser.id,
+    name: safeProfile.full_name || safeProfile.username || 'Kullanıcı',
+    username: safeProfile.username || safeProfile.full_name || 'kullanici',
+    identifier: authUser.email || safeProfile.phone || safeProfile.username,
+    email: authUser.email || safeProfile.email || '',
+    phone: safeProfile.phone || '',
+    city: safeProfile.city || 'İstanbul',
+    joinedAt: `${formatJoinedAt(safeProfile.created_at)}'den beri`,
+    isDemo: false,
+    avatarUrl: safeProfile.avatar_url || '',
+    verified: {
+      email: Boolean(authUser.email_confirmed_at),
+      phone: Boolean(safeProfile.phone_verified),
+    },
   }
 }
 
 export function AppStateProvider({ children }) {
-  const [state, setState] = useState(() => sanitizeState(loadState()))
+  const [uiState, setUiState] = useState(() => loadUiState())
+  const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    persistUiState(uiState)
+  }, [uiState])
+
+  const fetchProfile = useCallback(async (userId) => {
+    if (!supabase || !userId) {
+      return null
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  }, [])
+
+  const ensureProfile = useCallback(async (authUser) => {
+    if (!supabase || !authUser) {
+      return null
+    }
+
+    const existingProfile = await fetchProfile(authUser.id)
+
+    if (existingProfile) {
+      return existingProfile
+    }
+
+    const fallback = buildFallbackProfile(authUser)
+    const insertPayload = {
+      id: authUser.id,
+      email: authUser.email || '',
+      username: fallback.username,
+      full_name: fallback.full_name,
+      phone: fallback.phone || null,
+      city: fallback.city,
+      avatar_url: fallback.avatar_url || null,
+      phone_verified: false,
+    }
+
+    const { error } = await supabase.from('profiles').upsert(insertPayload)
+
+    if (error) {
+      return fallback
+    }
+
+    return fetchProfile(authUser.id)
+  }, [fetchProfile])
+
+  useEffect(() => {
+    if (!supabase) {
+      return undefined
+    }
+
+    let alive = true
+
+    const bootstrap = async () => {
+      const {
+        data: { session: activeSession },
+      } = await supabase.auth.getSession()
+
+      if (!alive) {
+        return
+      }
+
+      setSession(activeSession)
+
+      if (activeSession?.user) {
+        const nextProfile = await ensureProfile(activeSession.user)
+        if (alive) {
+          setProfile(nextProfile)
+        }
+      } else {
+        setProfile(null)
+      }
+
+      if (alive) {
+        setAuthReady(true)
+      }
+    }
+
+    bootstrap()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      if (!alive) {
+        return
+      }
+
+      setSession(nextSession)
+
+      if (nextSession?.user) {
+        const nextProfile = await ensureProfile(nextSession.user)
+        if (alive) {
+          setProfile(nextProfile)
+        }
+      } else {
+        setProfile(null)
+      }
+
+      if (alive) {
+        setAuthReady(true)
+      }
+    })
+
+    return () => {
+      alive = false
+      subscription.unsubscribe()
+    }
+  }, [ensureProfile])
+
+  const resolveLoginEmail = useCallback(async (identifier) => {
+    const trimmed = `${identifier || ''}`.trim()
+
+    if (isValidEmail(trimmed)) {
+      return trimmed
+    }
+
+    if (!supabase) {
+      throw new Error('Supabase ayarlanmadan giriş yapılamaz.')
+    }
+
+    const { data: usernameMatch } = await supabase
+      .from('profiles')
+      .select('email')
+      .ilike('username', trimmed)
+      .maybeSingle()
+
+    if (usernameMatch?.email) {
+      return usernameMatch.email
+    }
+
+    const normalizedPhone = normalizePhone(trimmed)
+    if (normalizedPhone) {
+      const { data: phoneMatch } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('phone', normalizedPhone)
+        .maybeSingle()
+
+      if (phoneMatch?.email) {
+        return phoneMatch.email
+      }
+    }
+
+    throw new Error('Bu kullanıcı adı, mail veya telefon ile eşleşen bir hesap bulunamadı.')
+  }, [])
+
+  const user = useMemo(
+    () => buildUserViewModel(session?.user, profile),
+    [profile, session?.user],
+  )
+
+  const allListings = useMemo(
+    () => [...uiState.userListings.map(normalizeListingRecord), ...featuredBikes.map(normalizeListingRecord)],
+    [uiState.userListings],
+  )
+
+  const authConfigured = isSupabaseConfigured
 
   const value = useMemo(
     () => ({
-      ...state,
-      allListings: [...state.userListings.map(normalizeListingRecord), ...featuredBikes.map(normalizeListingRecord)],
-      login(identifier) {
-        setState((current) => ({
-          ...current,
-          isAuthenticated: true,
-          user: current.user
-            ? { ...current.user, identifier }
-            : buildDemoUser(identifier),
-        }))
+      ...uiState,
+      allListings,
+      authConfigured,
+      authReady,
+      isAuthenticated: Boolean(session?.user),
+      session,
+      user,
+      async login(payload) {
+        if (!supabase) {
+          throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
+        }
+
+        const identifier = typeof payload === 'string' ? payload : payload.identifier
+        const password = typeof payload === 'string' ? '' : payload.password
+
+        if (!identifier || !password) {
+          throw new Error('Giriş için kullanıcı adı, mail ya da telefon ve şifre gerekli.')
+        }
+
+        const email = await resolveLoginEmail(identifier)
+        const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+        if (error) {
+          throw new Error(error.message)
+        }
       },
-      register(payload) {
-        setState((current) => ({
-          ...current,
-          isAuthenticated: true,
-          user: {
-            name: payload.name || 'Yeni Uye',
-            identifier: payload.email || payload.phone || payload.name,
-            email: payload.email || 'ornek@mail.com',
-            phone: payload.phone || '05xx xxx xx xx',
-            city: payload.city || 'İstanbul',
-            joinedAt: "Nisan 2026'dan beri",
-            isDemo: false,
-            verified: {
-              email: false,
-              phone: false,
+      async register(payload) {
+        if (!supabase) {
+          throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
+        }
+
+        const name = `${payload.name || ''}`.trim()
+        const email = `${payload.email || ''}`.trim().toLowerCase()
+        const phone = normalizePhone(payload.phone)
+        const password = `${payload.password || ''}`
+        const confirmPassword = `${payload.confirmPassword || ''}`
+
+        if (name.length < 3) {
+          throw new Error('Kullanıcı adı en az 3 karakter olmalı.')
+        }
+
+        if (!isValidEmail(email)) {
+          throw new Error('Geçerli bir e-posta adresi gir.')
+        }
+
+        if (password.length < 6) {
+          throw new Error('Şifre en az 6 karakter olmalı.')
+        }
+
+        if (password !== confirmPassword) {
+          throw new Error('Şifreler birbiriyle eşleşmiyor.')
+        }
+
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/giris?verified=1`,
+            data: {
+              username: name,
+              full_name: name,
+              phone,
             },
           },
-        }))
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+
+        return {
+          requiresEmailVerification: true,
+          email,
+        }
       },
-      logout() {
-        setState((current) => ({
+      async signInWithGoogle() {
+        if (!supabase) {
+          throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
+        }
+
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/profil`,
+          },
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      },
+      async resendVerificationEmail(email) {
+        if (!supabase) {
+          throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
+        }
+
+        const targetEmail = email || session?.user?.email
+
+        if (!targetEmail) {
+          throw new Error('Doğrulama maili için önce hesabın e-postası gerekli.')
+        }
+
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email: targetEmail,
+          options: {
+            emailRedirectTo: `${window.location.origin}/giris?verified=1`,
+          },
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      },
+      async sendPasswordReset(identifier) {
+        if (!supabase) {
+          throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
+        }
+
+        const email = await resolveLoginEmail(identifier)
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/sifre-sifirla`,
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+
+        return email
+      },
+      async updatePassword(nextPassword) {
+        if (!supabase) {
+          throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
+        }
+
+        const { error } = await supabase.auth.updateUser({
+          password: nextPassword,
+        })
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      },
+      async updateProfile(payload) {
+        if (!supabase || !session?.user) {
+          throw new Error('Profil güncellemek için oturum açman gerekiyor.')
+        }
+
+        const username = `${payload.username || ''}`.trim()
+        const city = `${payload.city || ''}`.trim()
+        const phone = normalizePhone(payload.phone)
+        let avatarUrl = profile?.avatar_url || ''
+
+        if (payload.avatarFile) {
+          const fileExtension = payload.avatarFile.name.split('.').pop() || 'jpg'
+          const filePath = `${session.user.id}/avatar-${Date.now()}.${fileExtension}`
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, payload.avatarFile, {
+              upsert: true,
+            })
+
+          if (uploadError) {
+            throw new Error(uploadError.message)
+          }
+
+          const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(filePath)
+          avatarUrl = publicData.publicUrl
+        }
+
+        if (username.length < 3) {
+          throw new Error('Kullanıcı adı en az 3 karakter olmalı.')
+        }
+
+        const updatePayload = {
+          id: session.user.id,
+          email: session.user.email || profile?.email || '',
+          username,
+          full_name: username,
+          city: city || 'İstanbul',
+          phone,
+          avatar_url: avatarUrl || null,
+          phone_verified: phone && phone === profile?.phone ? profile?.phone_verified ?? false : false,
+        }
+
+        const { error } = await supabase.from('profiles').upsert(updatePayload)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+
+        const nextProfile = await fetchProfile(session.user.id)
+        setProfile(nextProfile)
+        return nextProfile
+      },
+      async refreshProfile() {
+        if (!session?.user) {
+          return null
+        }
+
+        const nextProfile = await fetchProfile(session.user.id)
+        setProfile(nextProfile)
+        return nextProfile
+      },
+      async logout() {
+        if (!supabase) {
+          setSession(null)
+          setProfile(null)
+          return
+        }
+
+        const { error } = await supabase.auth.signOut()
+
+        if (error) {
+          throw new Error(error.message)
+        }
+
+        setUiState((current) => ({
           ...current,
-          isAuthenticated: false,
-          user: null,
           comparisons: [],
           messageRequests: [],
           activeChats: [],
@@ -201,7 +595,7 @@ export function AppStateProvider({ children }) {
         }))
       },
       toggleFavorite(listingId) {
-        setState((current) => {
+        setUiState((current) => {
           const exists = current.favorites.includes(listingId)
 
           return {
@@ -215,7 +609,7 @@ export function AppStateProvider({ children }) {
       toggleComparison(listingId) {
         let didSucceed = true
 
-        setState((current) => {
+        setUiState((current) => {
           const exists = current.comparisons.includes(listingId)
 
           if (exists) {
@@ -241,8 +635,8 @@ export function AppStateProvider({ children }) {
       sendMessageRequest(listing) {
         let didCreate = false
 
-        setState((current) => {
-          if (!current.isAuthenticated || !current.user) {
+        setUiState((current) => {
+          if (!session?.user || !user) {
             return current
           }
 
@@ -264,17 +658,17 @@ export function AppStateProvider({ children }) {
                 listingId: listing.id,
                 title: listing.title,
                 otherUser: listing.owner,
-                preview: 'Mesaj istegin gonderildi, satici onayi bekleniyor.',
+                preview: 'Mesaj isteğin gönderildi, satıcı onayı bekleniyor.',
                 status: 'pending',
-                date: 'Az once',
+                date: 'Az önce',
               },
               ...current.messageRequests,
             ],
             notifications: [
               {
                 id: `notification-${Date.now()}`,
-                title: 'Mesaj istegi gonderildi',
-                body: `${listing.title} ilani icin istegin saticiya ulasti.`,
+                title: 'Mesaj isteği gönderildi',
+                body: `${listing.title} ilanı için isteğin satıcıya ulaştı.`,
                 href: '/profil?tab=mesajlar',
                 unread: true,
                 createdAt: Date.now(),
@@ -287,7 +681,7 @@ export function AppStateProvider({ children }) {
         return didCreate
       },
       markNotificationsRead() {
-        setState((current) => {
+        setUiState((current) => {
           if (!current.notifications.some((item) => item.unread)) {
             return current
           }
@@ -304,14 +698,16 @@ export function AppStateProvider({ children }) {
       saveDraftListing(payload) {
         const draftId = payload.id || `draft-${Date.now()}`
 
-        setState((current) => {
+        setUiState((current) => {
           const record = buildListingRecord(
             {
               ...payload,
-              owner: current.user?.name || 'Satici',
-              phone: current.user?.phone || 'Telefon eklenmedi',
+              owner: user?.name || 'Satıcı',
+              phone: user?.phone || 'Telefon eklenmedi',
             },
             draftId,
+            user?.name,
+            user?.phone,
           )
           const existingIndex = current.draftListings.findIndex((item) => item.id === draftId)
 
@@ -334,7 +730,7 @@ export function AppStateProvider({ children }) {
         return draftId
       },
       publishDraftListing(draftId) {
-        setState((current) => {
+        setUiState((current) => {
           const draft = current.draftListings.find((item) => item.id === draftId)
 
           if (!draft) {
@@ -348,7 +744,7 @@ export function AppStateProvider({ children }) {
               {
                 ...draft,
                 id: `listing-${Date.now()}`,
-                updatedAt: 'Az once yayina alindi',
+                updatedAt: 'Az önce yayına alındı',
                 date: formatTurkishDate(),
               },
               ...current.userListings,
@@ -359,14 +755,16 @@ export function AppStateProvider({ children }) {
       publishListing(payload) {
         const listingId = `listing-${Date.now()}`
 
-        setState((current) => {
+        setUiState((current) => {
           const record = buildListingRecord(
             {
               ...payload,
-              owner: current.user?.name || 'Satici',
-              phone: current.user?.phone || 'Telefon eklenmedi',
+              owner: user?.name || 'Satıcı',
+              phone: user?.phone || 'Telefon eklenmedi',
             },
             listingId,
+            user?.name,
+            user?.phone,
           )
 
           return {
@@ -377,7 +775,7 @@ export function AppStateProvider({ children }) {
             userListings: [
               {
                 ...record,
-                updatedAt: 'Az once yayina alindi',
+                updatedAt: 'Az önce yayına alındı',
               },
               ...current.userListings,
             ],
@@ -387,7 +785,17 @@ export function AppStateProvider({ children }) {
         return listingId
       },
     }),
-    [state],
+    [
+      allListings,
+      authConfigured,
+      authReady,
+      fetchProfile,
+      profile,
+      resolveLoginEmail,
+      session,
+      uiState,
+      user,
+    ],
   )
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>

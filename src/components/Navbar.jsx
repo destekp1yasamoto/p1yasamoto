@@ -17,6 +17,7 @@ function Navbar({ minimal = false }) {
   const navigate = useNavigate()
   const previousUnreadRef = useRef(0)
   const {
+    authReady,
     comparisons,
     isAuthenticated,
     logout,
@@ -44,8 +45,8 @@ function Navbar({ minimal = false }) {
 
   const closeMobileMenu = () => setMobileOpen(false)
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     closeMobileMenu()
     navigate('/')
   }
@@ -119,7 +120,7 @@ function Navbar({ minimal = false }) {
                   </NavLink>
                 ))}
 
-                {isAuthenticated ? (
+                {authReady && isAuthenticated ? (
                   <>
                     <NavLink className="site-nav__cta site-nav__cta--secondary" to="/ilan-ekle">
                       <span className="site-nav__icon" aria-hidden="true">

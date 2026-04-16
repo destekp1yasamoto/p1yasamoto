@@ -3,6 +3,7 @@ import Home from './pages/Home'
 import AddListing from './pages/AddListing'
 import ContactPage from './pages/ContactPage'
 import FavoritesPage from './pages/FavoritesPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ListingDetailPage from './pages/ListingDetailPage'
 import LoginPage from './pages/LoginPage'
 import MessagesPage from './pages/MessagesPage'
@@ -30,6 +31,7 @@ function App() {
       <Route path="/iletisim" element={<ContactPage />} />
       <Route path="/giris" element={<LoginPage />} />
       <Route path="/kayit-ol" element={<RegisterPage />} />
+      <Route path="/sifre-sifirla" element={<ForgotPasswordPage />} />
       <Route
         path="/karsilastir"
         element={

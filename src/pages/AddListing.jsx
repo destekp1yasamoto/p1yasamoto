@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
+import { StarIcon, TrashIcon } from '../components/Icons'
 import { useAppState } from '../context/useAppState'
 import { brandModels, popularBrands, popularModels, turkeyCities } from '../data/turkeyData'
 import '../App.css'
@@ -105,12 +106,10 @@ function AddListing({ title, description }) {
 
   const [selectedPhotos, setSelectedPhotos] = useState(activeDraft?.selectedPhotos || [])
   const [coverPhotoIndex, setCoverPhotoIndex] = useState(activeDraft?.coverPhotoIndex ?? 0)
-  const [activePhotoMenuIndex, setActivePhotoMenuIndex] = useState(null)
   const [uploadError, setUploadError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [aiNotes, setAiNotes] = useState(activeDraft?.aiNotes || '')
   const [aiResult, setAiResult] = useState(activeDraft?.aiResult || '')
-  const photoMenuRef = useRef(null)
   const brandFieldRef = useRef(null)
   const modelFieldRef = useRef(null)
   const cityFieldRef = useRef(null)
@@ -130,10 +129,6 @@ function AddListing({ title, description }) {
 
   useEffect(() => {
     const handlePointerDown = (event) => {
-      if (!photoMenuRef.current?.contains(event.target)) {
-        setActivePhotoMenuIndex(null)
-      }
-
       if (
         !brandFieldRef.current?.contains(event.target)
         && !modelFieldRef.current?.contains(event.target)
@@ -223,7 +218,6 @@ function AddListing({ title, description }) {
       }),
     )
     setCoverPhotoIndex((current) => (index === current ? 0 : Math.max(0, current - (index < current ? 1 : 0))))
-    setActivePhotoMenuIndex(null)
   }
 
   const handleFieldChange = (field) => (event) => {
@@ -354,7 +348,7 @@ function AddListing({ title, description }) {
                   </p>
                   {uploadError ? <p className="form-error">{uploadError}</p> : null}
                   {selectedPhotos.length ? (
-                    <div ref={photoMenuRef} className="upload-grid">
+                    <div className="upload-grid">
                       {selectedPhotos.map((photo, index) => (
                         <article
                           key={`${photo.name}-${index}`}
@@ -366,40 +360,24 @@ function AddListing({ title, description }) {
                             ) : (
                               <span>{String(index + 1).padStart(2, '0')}</span>
                             )}
-                            {coverPhotoIndex === index ? (
-                              <span className="upload-item__badge">Kapakta</span>
-                            ) : (
-                              <>
-                                <button
-                                  className="upload-item__menu-button"
-                                  type="button"
-                                  aria-label={`${photo.name} için işlemler`}
-                                  onClick={() =>
-                                    setActivePhotoMenuIndex((current) => (current === index ? null : index))
-                                  }
-                                >
-                                  <span />
-                                  <span />
-                                  <span />
-                                </button>
-                                {activePhotoMenuIndex === index ? (
-                                  <div className="upload-item__menu">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setCoverPhotoIndex(index)
-                                        setActivePhotoMenuIndex(null)
-                                      }}
-                                    >
-                                      Kapak seç
-                                    </button>
-                                    <button type="button" onClick={() => handleRemovePhoto(index)}>
-                                      Kaldır
-                                    </button>
-                                  </div>
-                                ) : null}
-                              </>
-                            )}
+                            <div className="upload-item__actions">
+                              <button
+                                className={`upload-item__action-button${coverPhotoIndex === index ? ' is-active' : ''}`}
+                                type="button"
+                                aria-label={coverPhotoIndex === index ? 'Kapak fotoğrafı seçili' : 'Kapak fotoğrafı yap'}
+                                onClick={() => setCoverPhotoIndex(index)}
+                              >
+                                <StarIcon filled={coverPhotoIndex === index} />
+                              </button>
+                              <button
+                                className="upload-item__action-button upload-item__action-button--danger"
+                                type="button"
+                                aria-label={`${photo.name} fotoğrafını sil`}
+                                onClick={() => handleRemovePhoto(index)}
+                              >
+                                <TrashIcon />
+                              </button>
+                            </div>
                             <div className="upload-item__shade" />
                           </div>
                           <div className="upload-item__meta">
