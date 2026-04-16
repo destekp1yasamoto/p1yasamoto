@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
+import { GoogleIcon } from '../components/Icons'
 import { useAppState } from '../context/useAppState'
 import '../App.css'
 
@@ -118,8 +119,11 @@ function LoginPage() {
             {isSubmitting ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
           </button>
 
-          <button className="ghost-button auth-card__submit" type="button" onClick={handleGoogleLogin} disabled={!authConfigured}>
-            Google ile Devam Et
+          <button className="ghost-button auth-card__submit auth-card__oauth" type="button" onClick={handleGoogleLogin} disabled={!authConfigured}>
+            <span className="auth-card__oauth-icon" aria-hidden="true">
+              <GoogleIcon />
+            </span>
+            <span>Google</span>
           </button>
 
           <p className="auth-card__switch">
