@@ -285,6 +285,7 @@ export function AppStateProvider({ children }) {
       }
 
       setSession(activeSession)
+      setAuthReady(true)
 
       if (activeSession?.user) {
         const nextProfile = await ensureProfile(activeSession.user)
@@ -293,10 +294,6 @@ export function AppStateProvider({ children }) {
         }
       } else {
         setProfile(null)
-      }
-
-      if (alive) {
-        setAuthReady(true)
       }
     }
 
@@ -310,6 +307,7 @@ export function AppStateProvider({ children }) {
       }
 
       setSession(nextSession)
+      setAuthReady(true)
 
       if (nextSession?.user) {
         const nextProfile = await ensureProfile(nextSession.user)
@@ -318,10 +316,6 @@ export function AppStateProvider({ children }) {
         }
       } else {
         setProfile(null)
-      }
-
-      if (alive) {
-        setAuthReady(true)
       }
     })
 

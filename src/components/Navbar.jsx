@@ -35,7 +35,8 @@ function Navbar({ minimal = false }) {
     { label: 'Karşılaştır', to: '/karsilastir', icon: CompareIcon },
   ]
 
-  const navItems = isAuthenticated ? memberItems : guestItems
+  const showMemberNavigation = authReady && isAuthenticated
+  const navItems = showMemberNavigation ? memberItems : guestItems
   const unreadNotifications = notifications.filter((item) => item.unread)
   const hasUnreadNotifications = unreadNotifications.length > 0
   const latestNotification = unreadNotifications[0]
@@ -120,7 +121,7 @@ function Navbar({ minimal = false }) {
                   </NavLink>
                 ))}
 
-                {authReady && isAuthenticated ? (
+                {showMemberNavigation ? (
                   <>
                     <NavLink className="site-nav__cta site-nav__cta--secondary" to="/ilan-ekle">
                       <span className="site-nav__icon" aria-hidden="true">
@@ -191,7 +192,7 @@ function Navbar({ minimal = false }) {
               </NavLink>
             ))}
 
-            {!isAuthenticated ? (
+            {!showMemberNavigation ? (
               <NavLink className="mobile-menu__cta" to="/kayit-ol" onClick={closeMobileMenu}>
                 Kayıt Ol
               </NavLink>
@@ -207,7 +208,7 @@ function Navbar({ minimal = false }) {
         </div>
       ) : null}
 
-      {!minimal && isAuthenticated ? (
+      {!minimal && showMemberNavigation ? (
         <div className="mobile-bottom-nav">
           <NavLink
             to="/mesajlar"
