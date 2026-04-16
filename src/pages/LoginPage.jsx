@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { GoogleIcon } from '../components/Icons'
@@ -14,12 +14,16 @@ function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const { authConfigured, login, resendVerificationEmail, signInWithGoogle } = useAppState()
+  const { authConfigured, authReady, isAuthenticated, login, resendVerificationEmail, signInWithGoogle } = useAppState()
 
   const verificationEmail = useMemo(
     () => location.state?.verificationEmail || '',
     [location.state],
   )
+
+  if (authReady && isAuthenticated) {
+    return <Navigate to={location.state?.from || '/profil'} replace />
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()

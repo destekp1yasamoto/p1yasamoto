@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { GoogleIcon } from '../components/Icons'
@@ -17,7 +17,11 @@ function RegisterPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const navigate = useNavigate()
-  const { authConfigured, register, signInWithGoogle } = useAppState()
+  const { authConfigured, authReady, isAuthenticated, register, signInWithGoogle } = useAppState()
+
+  if (authReady && isAuthenticated) {
+    return <Navigate to="/profil" replace />
+  }
 
   const updateField = (field) => (event) => {
     setForm((current) => ({ ...current, [field]: event.target.value }))
