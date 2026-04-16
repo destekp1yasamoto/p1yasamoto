@@ -47,9 +47,14 @@ function Navbar({ minimal = false }) {
   const closeMobileMenu = () => setMobileOpen(false)
 
   const handleLogout = async () => {
-    await logout()
     closeMobileMenu()
-    navigate('/')
+
+    try {
+      await logout()
+      navigate('/', { replace: true })
+    } catch (error) {
+      window.alert(error.message || 'Çıkış yapılırken bir sorun oluştu.')
+    }
   }
 
   useEffect(() => {

@@ -182,6 +182,35 @@ function hasPendingAuthCallback() {
   return callbackTokens.some((token) => search.includes(token) || hash.includes(token))
 }
 
+function clearAuthArtifactsFromUrl() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const authSearchTokens = ['code', 'type', 'error', 'error_code', 'error_description']
+  const currentSearch = new URLSearchParams(window.location.search)
+  let searchChanged = false
+
+  authSearchTokens.forEach((token) => {
+    if (currentSearch.has(token)) {
+      currentSearch.delete(token)
+      searchChanged = true
+    }
+  })
+
+  const currentHash = window.location.hash || ''
+  const shouldClearHash = ['access_token=', 'refresh_token=', 'expires_at=', 'expires_in=', 'token_type=']
+    .some((token) => currentHash.includes(token))
+
+  if (!searchChanged && !shouldClearHash) {
+    return
+  }
+
+  const nextSearch = currentSearch.toString()
+  const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}`
+  window.history.replaceState({}, '', nextUrl)
+}
+
 function buildFallbackProfile(authUser) {
   const metadata = authUser?.user_metadata || {}
   const username = metadata.username || metadata.full_name || authUser?.email?.split('@')[0] || 'Kullanıcı'
@@ -672,27 +701,37 @@ export function AppStateProvider({ children }) {
         }
       },
       async logout() {
-        if (!supabase) {
+        const finalizeLogout = () => {
+          clearAuthArtifactsFromUrl()
           setSession(null)
           setProfile(null)
           setAuthFlow(null)
+          setAuthReady(true)
+          setUiState((current) => ({
+            ...current,
+            comparisons: [],
+            messageRequests: [],
+            activeChats: [],
+            notifications: [],
+          }))
+        }
+
+        if (!supabase) {
+          finalizeLogout()
           return
         }
 
         const { error } = await supabase.auth.signOut()
 
         if (error) {
-          throw new Error(error.message)
+          const { error: localError } = await supabase.auth.signOut({ scope: 'local' })
+
+          if (localError) {
+            throw new Error(localError.message || error.message)
+          }
         }
 
-        setUiState((current) => ({
-          ...current,
-          comparisons: [],
-          messageRequests: [],
-          activeChats: [],
-          notifications: [],
-        }))
-        setAuthFlow(null)
+        finalizeLogout()
       },
       toggleFavorite(listingId) {
         setUiState((current) => {
