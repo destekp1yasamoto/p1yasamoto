@@ -13,17 +13,25 @@ const ratingOptions = [
 ]
 
 function ContactPage() {
-  const { authConfigured, isAuthenticated, submitSupportMessage, user } = useAppState()
+  const { authConfigured, isAuthenticated, submitSupportMessage } = useAppState()
 
   const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
     subject: '',
     message: '',
   })
   const [contactFeedback, setContactFeedback] = useState({ error: '', success: '' })
 
   const [rating, setRating] = useState('iyi')
-  const [ratingMessage, setRatingMessage] = useState('')
+  const [ratingForm, setRatingForm] = useState({
+    name: '',
+    email: '',
+    message: '',
+  })
   const [ratingFeedback, setRatingFeedback] = useState({ error: '', success: '' })
+
+  const requireAuthMessage = 'Mesaj göndermek için önce hesabına giriş yapmalısın.'
 
   const updateContactField = (field) => (event) => {
     setContactForm((current) => ({
@@ -32,9 +40,12 @@ function ContactPage() {
     }))
   }
 
-  const requireAuthMessage = 'Mesaj göndermek için önce hesabına giriş yapmalısın.'
-  const contactName = user?.name || ''
-  const contactEmail = user?.email || ''
+  const updateRatingField = (field) => (event) => {
+    setRatingForm((current) => ({
+      ...current,
+      [field]: event.target.value,
+    }))
+  }
 
   const handleContactSubmit = async (event) => {
     event.preventDefault()
@@ -48,19 +59,22 @@ function ContactPage() {
     try {
       await submitSupportMessage({
         kind: 'contact',
+        name: contactForm.name,
+        email: contactForm.email,
         subject: contactForm.subject.trim() || 'P1yasaMoto İletişim Mesajı',
         message: contactForm.message,
       })
 
       setContactFeedback({
         error: '',
-        success: 'Mesajın başarıyla iletildi. Artık mail uygulamasına yönlendirilmiyorsun.',
+        success: 'Mesajın başarıyla iletildi.',
       })
-      setContactForm((current) => ({
-        ...current,
+      setContactForm({
+        name: '',
+        email: '',
         subject: '',
         message: '',
-      }))
+      })
     } catch (error) {
       setContactFeedback({
         error: error.message || 'Mesaj gönderilirken bir sorun oluştu.',
@@ -83,16 +97,22 @@ function ContactPage() {
     try {
       await submitSupportMessage({
         kind: 'rating',
+        name: ratingForm.name,
+        email: ratingForm.email,
         subject: `Site puanlama - ${selectedRating?.label || 'Geri Bildirim'}`,
-        message: ratingMessage,
+        message: ratingForm.message,
         rating: selectedRating?.label || '',
       })
 
       setRatingFeedback({
         error: '',
-        success: 'Puanlaman kaydedildi. Geri bildirimin destek paneline düştü.',
+        success: 'Puanlaman kaydedildi. Geri bildirimin bize ulaştı.',
       })
-      setRatingMessage('')
+      setRatingForm({
+        name: '',
+        email: '',
+        message: '',
+      })
     } catch (error) {
       setRatingFeedback({
         error: error.message || 'Puanlama gönderilirken bir sorun oluştu.',
@@ -109,7 +129,7 @@ function ContactPage() {
         <section className="contact-page">
           <div className="contact-header">
             <h1>İletişim & Geri Bildirim</h1>
-            <p>Sorularını ve görüşlerini bize doğrudan panel üzerinden iletebilirsin.</p>
+            <p>Sorularını ve görüşlerini doğrudan bize iletebilirsin.</p>
           </div>
 
           {!authConfigured ? (
@@ -125,8 +145,8 @@ function ContactPage() {
             <article className="contact-card">
               <h2>Önce Giriş Yap</h2>
               <p className="field-note">
-                İletişim mesajları ve site puanlamaları artık doğrudan hesabın üzerinden kaydediliyor. Bu yüzden
-                mesaj göndermek için önce hesabına giriş yapman gerekiyor.
+                İletişim mesajları ve site puanlamaları artık hesap üzerinden gönderiliyor. Bu yüzden önce giriş
+                yapman gerekiyor.
               </p>
               <div className="filter-actions">
                 <Link className="primary-button" to="/giris">
@@ -145,12 +165,24 @@ function ContactPage() {
               <div className="form-grid">
                 <label className="field-stack">
                   <span>Ad</span>
-                  <input className="input-shell" type="text" value={contactName} readOnly />
+                  <input
+                    className="input-shell"
+                    type="text"
+                    placeholder="Adını gir"
+                    value={contactForm.name}
+                    onChange={updateContactField('name')}
+                  />
                 </label>
 
                 <label className="field-stack">
                   <span>Email</span>
-                  <input className="input-shell" type="email" value={contactEmail} readOnly />
+                  <input
+                    className="input-shell"
+                    type="email"
+                    placeholder="ornek@mail.com"
+                    value={contactForm.email}
+                    onChange={updateContactField('email')}
+                  />
                 </label>
 
                 <label className="field-stack field-stack--full">
@@ -186,9 +218,33 @@ function ContactPage() {
 
           <article className="contact-card">
             <h2>Site Puanlama</h2>
-            <p className="field-note">Sitede neleri geliştirmemizi istediğini kısa notla bize ilet.</p>
+            <p className="field-note">Sitede neleri geliştirmemizi istediğini kısa bir notla ilet.</p>
 
             <form onSubmit={handleRatingSubmit}>
+              <div className="form-grid">
+                <label className="field-stack">
+                  <span>Ad</span>
+                  <input
+                    className="input-shell"
+                    type="text"
+                    placeholder="Adını gir"
+                    value={ratingForm.name}
+                    onChange={updateRatingField('name')}
+                  />
+                </label>
+
+                <label className="field-stack">
+                  <span>Email</span>
+                  <input
+                    className="input-shell"
+                    type="email"
+                    placeholder="ornek@mail.com"
+                    value={ratingForm.email}
+                    onChange={updateRatingField('email')}
+                  />
+                </label>
+              </div>
+
               <div className="rating-grid">
                 {ratingOptions.map((item) => (
                   <button
@@ -209,9 +265,9 @@ function ContactPage() {
                 <span>Açıklama / Metin</span>
                 <textarea
                   className="textarea-shell"
-                  placeholder="Burada şu özellik olabilir, mobilde şu alan geliştirilebilir, tasarımda bunu güçlendirebiliriz..."
-                  value={ratingMessage}
-                  onChange={(event) => setRatingMessage(event.target.value)}
+                  placeholder="Burada şu olabilir, mobilde şu alan geliştirilebilir, tasarımda bunu güçlendirebiliriz..."
+                  value={ratingForm.message}
+                  onChange={updateRatingField('message')}
                 />
               </label>
 

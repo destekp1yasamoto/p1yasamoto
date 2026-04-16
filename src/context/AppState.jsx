@@ -154,6 +154,10 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(`${email || ''}`.trim())
 }
 
+function normalizeDisplayText(value) {
+  return `${value || ''}`.trim().replace(/\s+/g, ' ')
+}
+
 function getAppBaseUrl() {
   if (configuredSiteUrl) {
     return configuredSiteUrl
@@ -164,6 +168,18 @@ function getAppBaseUrl() {
   }
 
   return ''
+}
+
+function hasPendingAuthCallback() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const search = window.location.search || ''
+  const hash = window.location.hash || ''
+  const callbackTokens = ['access_token=', 'refresh_token=', 'code=', 'type=recovery', 'type=signup']
+
+  return callbackTokens.some((token) => search.includes(token) || hash.includes(token))
 }
 
 function buildFallbackProfile(authUser) {
@@ -189,7 +205,6 @@ function buildUserViewModel(authUser, profile) {
   }
 
   const safeProfile = profile || buildFallbackProfile(authUser)
-
   return {
     id: authUser.id,
     name: safeProfile.full_name || safeProfile.username || 'Kullanıcı',
@@ -213,6 +228,7 @@ export function AppStateProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
+  const [authFlow, setAuthFlow] = useState(null)
 
   useEffect(() => {
     persistUiState(uiState)
@@ -242,8 +258,30 @@ export function AppStateProvider({ children }) {
     }
 
     const existingProfile = await fetchProfile(authUser.id)
+    const metadata = authUser?.user_metadata || {}
+    const preferredName = normalizeDisplayText(metadata.full_name || metadata.name || metadata.username)
+    const preferredUsername =
+      normalizeDisplayText(metadata.username || metadata.full_name || metadata.name)
+      || normalizeDisplayText(authUser.email?.split('@')[0] || '')
+      || 'kullanici'
+    const preferredAvatar = metadata.avatar_url || metadata.picture || null
 
     if (existingProfile) {
+      if (preferredName && (!existingProfile.full_name || existingProfile.full_name === existingProfile.username)) {
+        const { error: syncError } = await supabase.from('profiles').upsert({
+          ...existingProfile,
+          id: authUser.id,
+          email: authUser.email || existingProfile.email || '',
+          username: existingProfile.username || preferredUsername,
+          full_name: preferredName,
+          avatar_url: existingProfile.avatar_url || preferredAvatar,
+        })
+
+        if (!syncError) {
+          return fetchProfile(authUser.id)
+        }
+      }
+
       return existingProfile
     }
 
@@ -251,11 +289,11 @@ export function AppStateProvider({ children }) {
     const insertPayload = {
       id: authUser.id,
       email: authUser.email || '',
-      username: fallback.username,
-      full_name: fallback.full_name,
+      username: preferredUsername || fallback.username,
+      full_name: preferredName || fallback.full_name,
       phone: fallback.phone || null,
       city: fallback.city,
-      avatar_url: fallback.avatar_url || null,
+      avatar_url: preferredAvatar || fallback.avatar_url || null,
       phone_verified: false,
     }
 
@@ -276,11 +314,21 @@ export function AppStateProvider({ children }) {
     let alive = true
 
     const bootstrap = async () => {
+      const pendingAuthCallback = hasPendingAuthCallback()
       const {
         data: { session: activeSession },
       } = await supabase.auth.getSession()
 
       if (!alive) {
+        return
+      }
+
+      if (!activeSession?.user && pendingAuthCallback) {
+        window.setTimeout(() => {
+          if (alive) {
+            setAuthReady(true)
+          }
+        }, 1800)
         return
       }
 
@@ -301,11 +349,12 @@ export function AppStateProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
       if (!alive) {
         return
       }
 
+      setAuthFlow(event === 'PASSWORD_RECOVERY' ? 'recovery' : null)
       setSession(nextSession)
       setAuthReady(true)
 
@@ -379,6 +428,7 @@ export function AppStateProvider({ children }) {
       ...uiState,
       allListings,
       authConfigured,
+      authFlow,
       authReady,
       isAuthenticated: Boolean(session?.user),
       session,
@@ -594,6 +644,8 @@ export function AppStateProvider({ children }) {
         }
 
         const message = `${payload.message || ''}`.trim()
+        const nameSnapshot = normalizeDisplayText(payload.name || user.name)
+        const emailSnapshot = `${payload.email || user.email || ''}`.trim()
         const subject = `${payload.subject || ''}`.trim()
         const rating = `${payload.rating || ''}`.trim()
 
@@ -601,11 +653,15 @@ export function AppStateProvider({ children }) {
           throw new Error('Mesaj alanı boş bırakılamaz.')
         }
 
+        if (emailSnapshot && !isValidEmail(emailSnapshot)) {
+          throw new Error('Geçerli bir e-posta adresi girmen gerekiyor.')
+        }
+
         const { error } = await supabase.from('support_messages').insert({
           user_id: session.user.id,
           kind: payload.kind,
-          name_snapshot: user.name,
-          email_snapshot: user.email,
+          name_snapshot: nameSnapshot || null,
+          email_snapshot: emailSnapshot || null,
           subject: subject || null,
           message,
           rating: rating || null,
@@ -619,6 +675,7 @@ export function AppStateProvider({ children }) {
         if (!supabase) {
           setSession(null)
           setProfile(null)
+          setAuthFlow(null)
           return
         }
 
@@ -635,6 +692,7 @@ export function AppStateProvider({ children }) {
           activeChats: [],
           notifications: [],
         }))
+        setAuthFlow(null)
       },
       toggleFavorite(listingId) {
         setUiState((current) => {
@@ -830,6 +888,7 @@ export function AppStateProvider({ children }) {
     [
       allListings,
       authConfigured,
+      authFlow,
       authReady,
       fetchProfile,
       profile,

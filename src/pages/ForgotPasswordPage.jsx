@@ -8,7 +8,7 @@ import '../App.css'
 function ForgotPasswordPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { authConfigured, sendPasswordReset, session, updatePassword } = useAppState()
+  const { authConfigured, authFlow, logout, sendPasswordReset, session, updatePassword } = useAppState()
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -19,8 +19,12 @@ function ForgotPasswordPage() {
 
   const isRecoveryMode = useMemo(() => {
     const fullLocation = `${location.pathname}${location.search}${location.hash}`
-    return fullLocation.includes('type=recovery') || Boolean(session?.user && location.hash.includes('access_token'))
-  }, [location.hash, location.pathname, location.search, session?.user])
+    return (
+      authFlow === 'recovery' ||
+      fullLocation.includes('type=recovery') ||
+      Boolean(session?.user && location.pathname === '/sifre-sifirla')
+    )
+  }, [authFlow, location.hash, location.pathname, location.search, session?.user])
 
   const handleResetRequest = async (event) => {
     event.preventDefault()
@@ -68,16 +72,27 @@ function ForgotPasswordPage() {
     }
   }
 
+  const handleSkipToLogin = async () => {
+    setErrorMessage('')
+    setSuccessMessage('')
+
+    if (session?.user) {
+      await logout()
+    }
+
+    navigate('/giris')
+  }
+
   return (
     <div className="page-shell">
       <Navbar minimal />
 
       <main className="auth-page">
         <form className="auth-card" onSubmit={isRecoveryMode ? handlePasswordUpdate : handleResetRequest}>
-          <h1>{isRecoveryMode ? 'Yeni Şifre Oluştur' : 'Şifremi Unuttum'}</h1>
+          <h1>{isRecoveryMode ? 'Yeni Şifrenizi Girin' : 'Şifremi Unuttum'}</h1>
           <p>
             {isRecoveryMode
-              ? 'Mailden gelen güvenli bağlantı ile yeni şifreni oluştur ya da giriş ekranına dön.'
+              ? 'Mailden gelen güvenli bağlantı ile yeni şifreni oluştur ya da bu adımı geçip giriş ekranına dön.'
               : 'Mail, kullanıcı adı ya da telefon yazarak şifre sıfırlama bağlantısı iste.'}
           </p>
 
@@ -127,6 +142,12 @@ function ForgotPasswordPage() {
           <button className="primary-button auth-card__submit" type="submit" disabled={isSubmitting || !authConfigured}>
             {isSubmitting ? 'İşleniyor...' : isRecoveryMode ? 'Şifreyi Güncelle' : 'Sıfırlama Linki Gönder'}
           </button>
+
+          {isRecoveryMode ? (
+            <button className="ghost-button auth-card__submit" type="button" onClick={handleSkipToLogin}>
+              Geç ve Giriş Yap
+            </button>
+          ) : null}
 
           <p className="auth-card__switch">
             <Link to="/giris">Giriş Yap</Link>
