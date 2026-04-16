@@ -654,9 +654,33 @@ export function AppStateProvider({ children }) {
           throw new Error(error.message)
         }
 
-        const nextProfile = await fetchProfile(session.user.id)
-        setProfile(nextProfile)
-        return nextProfile
+        const optimisticProfile = {
+          ...profile,
+          ...updatePayload,
+          created_at: profile?.created_at || session.user.created_at || new Date().toISOString(),
+        }
+
+        setProfile(optimisticProfile)
+
+        supabase.auth.updateUser({
+          data: {
+            username,
+            full_name: username,
+            phone,
+            city: city || 'Ä°stanbul',
+            avatar_url: avatarUrl || null,
+          },
+        }).catch(() => {})
+
+        fetchProfile(session.user.id)
+          .then((nextProfile) => {
+            if (nextProfile) {
+              setProfile(nextProfile)
+            }
+          })
+          .catch(() => {})
+
+        return optimisticProfile
       },
       async refreshProfile() {
         if (!session?.user) {

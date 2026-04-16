@@ -26,7 +26,6 @@ function ProfilePage() {
     messageRequests,
     notifications,
     publishDraftListing,
-    refreshProfile,
     resendVerificationEmail,
     updateProfile,
     user,
@@ -87,7 +86,6 @@ function ProfilePage() {
         city: profileForm.city,
         avatarFile,
       })
-      await refreshProfile()
       setAvatarFile(null)
       setFeedback({
         error: '',
