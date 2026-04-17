@@ -211,6 +211,59 @@ function clearAuthArtifactsFromUrl() {
   window.history.replaceState({}, '', nextUrl)
 }
 
+function withTimeout(promise, fallbackMessage, timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error(fallbackMessage))
+    }, timeoutMs)
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((error) => {
+        window.clearTimeout(timer)
+        reject(error)
+      })
+  })
+}
+
+function normalizeSupabaseError(error, fallbackMessage) {
+  const rawMessage = `${error?.message || error || ''}`.trim()
+  const message = rawMessage.toLowerCase()
+
+  if (message.includes('failed to fetch') || message.includes('network')) {
+    return 'Sunucuya bağlanılamadı. İnternetini ve Supabase ayarlarını kontrol edip tekrar dene.'
+  }
+
+  if (message.includes('zaman aşımı') || message.includes('timeout')) {
+    return 'Sunucu yanıt vermedi. Birkaç saniye sonra tekrar dene.'
+  }
+
+  if (message.includes('relation') && message.includes('does not exist')) {
+    return 'Supabase veritabanı tabloları eksik. SQL kurulumunu tekrar çalıştırman gerekiyor.'
+  }
+
+  if (message.includes('bucket') && (message.includes('not found') || message.includes('does not exist'))) {
+    return 'Profil fotoğrafı alanı hazır değil. Supabase storage bucket ayarını kontrol et.'
+  }
+
+  if (message.includes('row-level security')) {
+    return 'Supabase yetki kuralı bu işlemi engelledi. Policy ayarlarını kontrol et.'
+  }
+
+  if (message.includes('invalid login credentials')) {
+    return 'Kullanıcı adı, mail, telefon ya da şifre hatalı.'
+  }
+
+  if (message.includes('email rate limit exceeded')) {
+    return 'Çok sık denendiği için geçici olarak beklemen gerekiyor.'
+  }
+
+  return rawMessage || fallbackMessage
+}
+
 function buildFallbackProfile(authUser) {
   const metadata = authUser?.user_metadata || {}
   const username = metadata.username || metadata.full_name || authUser?.email?.split('@')[0] || 'Kullanıcı'
@@ -335,6 +388,21 @@ export function AppStateProvider({ children }) {
     return fetchProfile(authUser.id)
   }, [fetchProfile])
 
+  const safeEnsureProfile = useCallback(async (authUser) => {
+    if (!authUser) {
+      return null
+    }
+
+    try {
+      return await withTimeout(
+        ensureProfile(authUser),
+        'Profil bilgileri zamanında alınamadı.',
+      )
+    } catch {
+      return buildFallbackProfile(authUser)
+    }
+  }, [ensureProfile])
+
   useEffect(() => {
     if (!supabase) {
       return undefined
@@ -343,21 +411,41 @@ export function AppStateProvider({ children }) {
     let alive = true
 
     const bootstrap = async () => {
-      const pendingAuthCallback = hasPendingAuthCallback()
-      const {
-        data: { session: activeSession },
-      } = await supabase.auth.getSession()
+      let activeSession = null
 
-      if (!alive) {
+      try {
+        const pendingAuthCallback = hasPendingAuthCallback()
+        const {
+          data: { session: bootSession },
+        } = await withTimeout(
+          supabase.auth.getSession(),
+          'Oturum bilgisi alınırken zaman aşımı oluştu.',
+        )
+
+        activeSession = bootSession
+
+        if (!alive) {
+          return
+        }
+
+        if (!activeSession?.user && pendingAuthCallback) {
+          window.setTimeout(() => {
+            if (alive) {
+              setAuthReady(true)
+            }
+          }, 1800)
+          return
+        }
+      } catch {
+        if (alive) {
+          setSession(null)
+          setProfile(null)
+          setAuthReady(true)
+        }
         return
       }
 
-      if (!activeSession?.user && pendingAuthCallback) {
-        window.setTimeout(() => {
-          if (alive) {
-            setAuthReady(true)
-          }
-        }, 1800)
+      if (!alive) {
         return
       }
 
@@ -365,7 +453,7 @@ export function AppStateProvider({ children }) {
       setAuthReady(true)
 
       if (activeSession?.user) {
-        const nextProfile = await ensureProfile(activeSession.user)
+        const nextProfile = await safeEnsureProfile(activeSession.user)
         if (alive) {
           setProfile(nextProfile)
         }
@@ -388,7 +476,7 @@ export function AppStateProvider({ children }) {
       setAuthReady(true)
 
       if (nextSession?.user) {
-        const nextProfile = await ensureProfile(nextSession.user)
+        const nextProfile = await safeEnsureProfile(nextSession.user)
         if (alive) {
           setProfile(nextProfile)
         }
@@ -401,7 +489,7 @@ export function AppStateProvider({ children }) {
       alive = false
       subscription.unsubscribe()
     }
-  }, [ensureProfile])
+  }, [safeEnsureProfile])
 
   const resolveLoginEmail = useCallback(async (identifier) => {
     const trimmed = `${identifier || ''}`.trim()
@@ -474,11 +562,18 @@ export function AppStateProvider({ children }) {
           throw new Error('Giriş için kullanıcı adı, mail ya da telefon ve şifre gerekli.')
         }
 
-        const email = await resolveLoginEmail(identifier)
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        try {
+          const email = await resolveLoginEmail(identifier)
+          const { error } = await withTimeout(
+            supabase.auth.signInWithPassword({ email, password }),
+            'Giriş isteği zaman aşımına uğradı.',
+          )
 
-        if (error) {
-          throw new Error(error.message)
+          if (error) {
+            throw error
+          }
+        } catch (error) {
+          throw new Error(normalizeSupabaseError(error, 'Giriş sırasında bir sorun oluştu.'))
         }
       },
       async register(payload) {
@@ -510,21 +605,28 @@ export function AppStateProvider({ children }) {
           throw new Error('Şifreler birbiriyle eşleşmiyor.')
         }
 
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${appBaseUrl}/giris?verified=1`,
-            data: {
-              username: name,
-              full_name: name,
-              phone,
-            },
-          },
-        })
+        try {
+          const { error } = await withTimeout(
+            supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                emailRedirectTo: `${appBaseUrl}/giris?verified=1`,
+                data: {
+                  username: name,
+                  full_name: name,
+                  phone,
+                },
+              },
+            }),
+            'Kayıt isteği zaman aşımına uğradı.',
+          )
 
-        if (error) {
-          throw new Error(error.message)
+          if (error) {
+            throw error
+          }
+        } catch (error) {
+          throw new Error(normalizeSupabaseError(error, 'Kayıt sırasında bir sorun oluştu.'))
         }
 
         return {
@@ -539,15 +641,22 @@ export function AppStateProvider({ children }) {
 
         const appBaseUrl = getAppBaseUrl()
 
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: `${appBaseUrl}/profil`,
-          },
-        })
+        try {
+          const { error } = await withTimeout(
+            supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo: `${appBaseUrl}/profil`,
+              },
+            }),
+            'Google girişi başlatılırken zaman aşımı oluştu.',
+          )
 
-        if (error) {
-          throw new Error(error.message)
+          if (error) {
+            throw error
+          }
+        } catch (error) {
+          throw new Error(normalizeSupabaseError(error, 'Google ile giriş başlatılamadı.'))
         }
       },
       async resendVerificationEmail(email) {
@@ -563,16 +672,23 @@ export function AppStateProvider({ children }) {
           throw new Error('Doğrulama maili için önce hesabın e-postası gerekli.')
         }
 
-        const { error } = await supabase.auth.resend({
-          type: 'signup',
-          email: targetEmail,
-          options: {
-            emailRedirectTo: `${appBaseUrl}/giris?verified=1`,
-          },
-        })
+        try {
+          const { error } = await withTimeout(
+            supabase.auth.resend({
+              type: 'signup',
+              email: targetEmail,
+              options: {
+                emailRedirectTo: `${appBaseUrl}/giris?verified=1`,
+              },
+            }),
+            'Doğrulama maili gönderilirken zaman aşımı oluştu.',
+          )
 
-        if (error) {
-          throw new Error(error.message)
+          if (error) {
+            throw error
+          }
+        } catch (error) {
+          throw new Error(normalizeSupabaseError(error, 'Doğrulama maili tekrar gönderilemedi.'))
         }
       },
       async sendPasswordReset(identifier) {
@@ -582,13 +698,22 @@ export function AppStateProvider({ children }) {
 
         const appBaseUrl = getAppBaseUrl()
 
-        const email = await resolveLoginEmail(identifier)
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${appBaseUrl}/sifre-sifirla`,
-        })
+        let email = ''
 
-        if (error) {
-          throw new Error(error.message)
+        try {
+          email = await resolveLoginEmail(identifier)
+          const { error } = await withTimeout(
+            supabase.auth.resetPasswordForEmail(email, {
+              redirectTo: `${appBaseUrl}/sifre-sifirla`,
+            }),
+            'Şifre sıfırlama isteği zaman aşımına uğradı.',
+          )
+
+          if (error) {
+            throw error
+          }
+        } catch (error) {
+          throw new Error(normalizeSupabaseError(error, 'Şifre sıfırlama maili gönderilemedi.'))
         }
 
         return email
@@ -598,12 +723,19 @@ export function AppStateProvider({ children }) {
           throw new Error('Supabase bağlantısı eksik. Önce .env ayarlarını tamamla.')
         }
 
-        const { error } = await supabase.auth.updateUser({
-          password: nextPassword,
-        })
+        try {
+          const { error } = await withTimeout(
+            supabase.auth.updateUser({
+              password: nextPassword,
+            }),
+            'Şifre güncellenirken zaman aşımı oluştu.',
+          )
 
-        if (error) {
-          throw new Error(error.message)
+          if (error) {
+            throw error
+          }
+        } catch (error) {
+          throw new Error(normalizeSupabaseError(error, 'Şifre güncellenemedi.'))
         }
       },
       async updateProfile(payload) {
@@ -619,14 +751,17 @@ export function AppStateProvider({ children }) {
         if (payload.avatarFile) {
           const fileExtension = payload.avatarFile.name.split('.').pop() || 'jpg'
           const filePath = `${session.user.id}/avatar-${Date.now()}.${fileExtension}`
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(filePath, payload.avatarFile, {
-              upsert: true,
-            })
+          const { error: uploadError } = await withTimeout(
+            supabase.storage
+              .from('avatars')
+              .upload(filePath, payload.avatarFile, {
+                upsert: true,
+              }),
+            'Profil fotoğrafı yüklenirken zaman aşımı oluştu.',
+          )
 
           if (uploadError) {
-            throw new Error(uploadError.message)
+            throw uploadError
           }
 
           const { data: publicData } = supabase.storage.from('avatars').getPublicUrl(filePath)
@@ -648,10 +783,13 @@ export function AppStateProvider({ children }) {
           phone_verified: phone && phone === profile?.phone ? profile?.phone_verified ?? false : false,
         }
 
-        const { error } = await supabase.from('profiles').upsert(updatePayload)
+        const { error } = await withTimeout(
+          supabase.from('profiles').upsert(updatePayload),
+          'Profil kaydı zaman aşımına uğradı.',
+        )
 
         if (error) {
-          throw new Error(error.message)
+          throw error
         }
 
         const optimisticProfile = {
@@ -687,9 +825,16 @@ export function AppStateProvider({ children }) {
           return null
         }
 
-        const nextProfile = await fetchProfile(session.user.id)
-        setProfile(nextProfile)
-        return nextProfile
+        try {
+          const nextProfile = await withTimeout(
+            fetchProfile(session.user.id),
+            'Profil bilgileri yenilenirken zaman aşımı oluştu.',
+          )
+          setProfile(nextProfile)
+          return nextProfile
+        } catch {
+          return profile || null
+        }
       },
       async submitSupportMessage(payload) {
         if (!supabase || !session?.user || !user) {
@@ -710,18 +855,25 @@ export function AppStateProvider({ children }) {
           throw new Error('Geçerli bir e-posta adresi girmen gerekiyor.')
         }
 
-        const { error } = await supabase.from('support_messages').insert({
-          user_id: session.user.id,
-          kind: payload.kind,
-          name_snapshot: nameSnapshot || null,
-          email_snapshot: emailSnapshot || null,
-          subject: subject || null,
-          message,
-          rating: rating || null,
-        })
+        try {
+          const { error } = await withTimeout(
+            supabase.from('support_messages').insert({
+              user_id: session.user.id,
+              kind: payload.kind,
+              name_snapshot: nameSnapshot || null,
+              email_snapshot: emailSnapshot || null,
+              subject: subject || null,
+              message,
+              rating: rating || null,
+            }),
+            'Mesaj gönderilirken zaman aşımı oluştu.',
+          )
 
-        if (error) {
-          throw new Error(error.message)
+          if (error) {
+            throw error
+          }
+        } catch (error) {
+          throw new Error(normalizeSupabaseError(error, 'Mesaj gönderilemedi.'))
         }
       },
       async logout() {
