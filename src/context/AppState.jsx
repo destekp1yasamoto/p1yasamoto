@@ -526,27 +526,19 @@ export function AppStateProvider({ children }) {
       throw new Error('Supabase ayarlanmadan giriş yapılamaz.')
     }
 
-    const { data: usernameMatch } = await supabase
-      .from('profiles')
-      .select('email')
-      .ilike('username', trimmed)
-      .maybeSingle()
+    const { data, error } = await withTimeout(
+      supabase.rpc('resolve_login_email', {
+        identifier_input: trimmed,
+      }),
+      'Kullanıcı bilgisi kontrol edilirken zaman aşımı oluştu.',
+    )
 
-    if (usernameMatch?.email) {
-      return usernameMatch.email
+    if (error) {
+      throw new Error(normalizeSupabaseError(error, 'Kullanıcı bilgisi çözümlenemedi.'))
     }
 
-    const normalizedPhone = normalizePhone(trimmed)
-    if (normalizedPhone) {
-      const { data: phoneMatch } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('phone', normalizedPhone)
-        .maybeSingle()
-
-      if (phoneMatch?.email) {
-        return phoneMatch.email
-      }
+    if (data) {
+      return data
     }
 
     throw new Error('Bu kullanıcı adı, mail veya telefon ile eşleşen bir hesap bulunamadı.')

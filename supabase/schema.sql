@@ -77,6 +77,39 @@ begin
 end;
 $$;
 
+create or replace function public.resolve_login_email(identifier_input text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  normalized_identifier text := lower(trim(identifier_input));
+  normalized_phone text := regexp_replace(coalesce(identifier_input, ''), '[^0-9+]', '', 'g');
+  resolved_email text;
+begin
+  if normalized_identifier is null or normalized_identifier = '' then
+    return null;
+  end if;
+
+  select p.email
+  into resolved_email
+  from public.profiles p
+  where lower(p.username) = normalized_identifier
+     or lower(coalesce(p.full_name, '')) = normalized_identifier
+     or (
+       normalized_phone <> ''
+       and coalesce(p.phone, '') = normalized_phone
+     )
+  order by p.updated_at desc nulls last, p.created_at desc
+  limit 1;
+
+  return resolved_email;
+end;
+$$;
+
+grant execute on function public.resolve_login_email(text) to anon, authenticated;
+
 drop trigger if exists set_profile_updated_at on public.profiles;
 
 create trigger set_profile_updated_at
