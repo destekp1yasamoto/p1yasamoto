@@ -5,6 +5,7 @@ import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { CompareIcon, PinIcon } from '../components/Icons'
 import { useAppState } from '../context/useAppState'
+import { getVisualStyle } from '../lib/visuals'
 import '../App.css'
 
 function ListingDetailPage() {
@@ -18,6 +19,7 @@ function ListingDetailPage() {
     messageRequests,
     sendMessageRequest,
     toggleComparison,
+    user,
   } = useAppState()
 
   const bike = allListings.find((item) => item.id === id)
@@ -44,6 +46,11 @@ function ListingDetailPage() {
   const safeIndex = Math.min(activeIndex, Math.max(galleryItems.length - 1, 0))
   const isCompared = comparisons.includes(bike.id)
   const hasPendingRequest = messageRequests.some((item) => item.listingId === bike.id)
+  const isOwner = Boolean(
+    (user?.id && bike.ownerId && user.id === bike.ownerId)
+    || (user?.name && bike.owner && user.name === bike.owner)
+    || (user?.username && bike.owner && user.username === bike.owner),
+  )
 
   const handleCompare = () => {
     if (!isAuthenticated) {
@@ -57,6 +64,10 @@ function ListingDetailPage() {
   const handleMessageRequest = () => {
     if (!isAuthenticated) {
       navigate('/giris')
+      return
+    }
+
+    if (isOwner) {
       return
     }
 
@@ -82,7 +93,7 @@ function ListingDetailPage() {
               <article className="detail-gallery">
                 <div
                   className="detail-gallery__image"
-                  style={{ background: galleryItems[safeIndex] }}
+                  style={getVisualStyle(galleryItems[safeIndex])}
                 >
                   <span className="detail-gallery__count">
                     {safeIndex + 1}/{galleryItems.length}
@@ -185,13 +196,16 @@ function ListingDetailPage() {
 
               <article className="seller-card">
                 <h2>Satıcıya Mesaj</h2>
-                {isAuthenticated ? (
+                {isOwner ? (
+                  <p>Bu ilan sana ait. Kendine mesaj isteği gönderemezsin.</p>
+                ) : isAuthenticated ? (
                   <>
                     <p>Mesaj isteği göndererek sohbet başlatabilirsin.</p>
                     <button
                       className="primary-button seller-card__button"
                       type="button"
                       onClick={handleMessageRequest}
+                      disabled={hasPendingRequest}
                     >
                       {hasPendingRequest ? 'İstek Gönderildi' : 'Mesaj İsteği Gönder'}
                     </button>

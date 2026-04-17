@@ -4,6 +4,7 @@ import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { featuredBikes } from '../data/featuredBikes'
 import { useAppState } from '../context/useAppState'
+import { getVisualStyle } from '../lib/visuals'
 import '../App.css'
 
 function ProfilePage() {
@@ -170,7 +171,7 @@ function ProfilePage() {
                 <div className="profile-list">
                   {ownedListings.map((bike) => (
                     <article key={bike.id} className="profile-listing">
-                      <div className="profile-listing__thumb" style={{ background: bike.visual }} />
+                      <div className="profile-listing__thumb" style={getVisualStyle(bike.visual)} />
                       <div className="profile-listing__content">
                         <strong>{bike.title}</strong>
                         <p>{bike.price}</p>
@@ -201,7 +202,7 @@ function ProfilePage() {
                   <div className="profile-list">
                     {draftListings.map((draft) => (
                       <article key={draft.id} className="profile-listing profile-listing--draft">
-                        <div className="profile-listing__thumb" style={{ background: draft.visual }} />
+                        <div className="profile-listing__thumb" style={getVisualStyle(draft.visual)} />
                         <div className="profile-listing__content">
                           <strong>{draft.title || 'Taslak ilan'}</strong>
                           <p>{draft.price}</p>
@@ -237,7 +238,7 @@ function ProfilePage() {
               <div className="profile-list">
                 {favoriteItems.map((bike) => (
                   <article key={bike.id} className="profile-listing">
-                    <div className="profile-listing__thumb" style={{ background: bike.visual }} />
+                    <div className="profile-listing__thumb" style={getVisualStyle(bike.visual)} />
                     <div className="profile-listing__content">
                       <strong>{bike.title}</strong>
                       <p>{bike.price}</p>

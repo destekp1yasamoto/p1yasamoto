@@ -3,6 +3,7 @@ import Footer from '../components/Footer'
 import Navbar from '../components/Navbar'
 import { CompareIcon } from '../components/Icons'
 import { useAppState } from '../context/useAppState'
+import { getVisualStyle } from '../lib/visuals'
 import '../App.css'
 
 function ComparePage() {
@@ -34,7 +35,7 @@ function ComparePage() {
                     <>
                       <div
                         className="compare-slot__visual"
-                        style={{ background: item.visual }}
+                        style={getVisualStyle(item.visual)}
                       />
                       <h2>{item.title}</h2>
                       <p>{item.price}</p>

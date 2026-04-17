@@ -20,7 +20,23 @@ function asText(value, fallback) {
   return typeof value === 'string' && value.trim() ? value : fallback
 }
 
+function extractPhotoVisuals(photos) {
+  if (!Array.isArray(photos) || !photos.length) {
+    return []
+  }
+
+  return photos
+    .map((photo) => photo?.previewUrl || photo?.url || '')
+    .filter((item) => typeof item === 'string' && item.trim())
+}
+
 function buildSafeGallery(payload, visual) {
+  const photoVisuals = extractPhotoVisuals(payload.selectedPhotos)
+
+  if (photoVisuals.length) {
+    return photoVisuals
+  }
+
   if (Array.isArray(payload.gallery) && payload.gallery.length) {
     const galleryItems = payload.gallery.filter((item) => typeof item === 'string' && item.trim())
 
@@ -47,8 +63,9 @@ function formatJoinedAt(dateString) {
 }
 
 function normalizeListingRecord(item) {
-  const visual = asText(item.visual, 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)')
-  const gallery = buildSafeGallery(item, visual)
+  const fallbackVisual = 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)'
+  const gallery = buildSafeGallery(item, asText(item.visual, fallbackVisual))
+  const visual = gallery[Number(item.coverPhotoIndex) || 0] || asText(item.visual, fallbackVisual)
 
   return {
     ...item,
@@ -71,13 +88,18 @@ function normalizeListingRecord(item) {
     gallery,
     photoCount: item.photoCount ?? item.selectedPhotos?.length ?? gallery.length,
     selectedPhotos: Array.isArray(item.selectedPhotos) ? item.selectedPhotos : [],
+    coverPhotoIndex: Number.isInteger(item.coverPhotoIndex) ? item.coverPhotoIndex : 0,
+    ownerId: item.ownerId || null,
     updatedAt: item.updatedAt || 'Az önce',
   }
 }
 
 function buildListingRecord(payload, id, ownerName, ownerPhone) {
-  const visual = payload.visual || 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)'
+  const fallbackVisual = 'linear-gradient(135deg, #441111 0%, #1a1a1a 100%)'
   const year = payload.year || '2026'
+  const gallery = buildSafeGallery(payload, payload.visual || fallbackVisual)
+  const coverPhotoIndex = Number.isInteger(payload.coverPhotoIndex) ? payload.coverPhotoIndex : 0
+  const visual = gallery[coverPhotoIndex] || payload.visual || fallbackVisual
 
   return {
     id,
@@ -93,14 +115,16 @@ function buildListingRecord(payload, id, ownerName, ownerPhone) {
     owner: payload.owner || ownerName || 'Satıcı',
     brand: payload.brand || 'Marka',
     phone: payload.phone || ownerPhone || 'Telefon eklenmedi',
+    ownerId: payload.ownerId || null,
     plate: payload.plate || '',
     plateMasked: payload.plateMasked || 'Plaka yok',
     date: payload.date || formatTurkishDate(),
     description: payload.description || 'Açıklama eklenmedi.',
     visual,
-    gallery: buildSafeGallery(payload, visual),
-    photoCount: payload.selectedPhotos?.length || 0,
+    gallery,
+    photoCount: payload.selectedPhotos?.length || gallery.length,
     selectedPhotos: payload.selectedPhotos || [],
+    coverPhotoIndex,
     updatedAt: payload.updatedAt || 'Az önce',
   }
 }
@@ -879,6 +903,20 @@ export function AppStateProvider({ children }) {
       async logout() {
         const finalizeLogout = () => {
           clearAuthArtifactsFromUrl()
+          if (typeof window !== 'undefined') {
+            const authStorageKeys = []
+
+            for (let index = 0; index < window.localStorage.length; index += 1) {
+              const key = window.localStorage.key(index)
+              if (key && key.startsWith('sb-') && key.includes('-auth-token')) {
+                authStorageKeys.push(key)
+              }
+            }
+
+            authStorageKeys.forEach((key) => {
+              window.localStorage.removeItem(key)
+            })
+          }
           setSession(null)
           setProfile(null)
           setAuthFlow(null)
@@ -955,6 +993,14 @@ export function AppStateProvider({ children }) {
             return current
           }
 
+          if (
+            (listing.ownerId && listing.ownerId === session.user.id)
+            || (user?.name && listing.owner && user.name === listing.owner)
+            || (user?.username && listing.owner && user.username === listing.owner)
+          ) {
+            return current
+          }
+
           const existingRequest = current.messageRequests.find(
             (item) => item.listingId === listing.id && item.status === 'pending',
           )
@@ -1019,6 +1065,7 @@ export function AppStateProvider({ children }) {
               ...payload,
               owner: user?.name || 'Satıcı',
               phone: user?.phone || 'Telefon eklenmedi',
+              ownerId: session?.user?.id || null,
             },
             draftId,
             user?.name,
@@ -1076,6 +1123,7 @@ export function AppStateProvider({ children }) {
               ...payload,
               owner: user?.name || 'Satıcı',
               phone: user?.phone || 'Telefon eklenmedi',
+              ownerId: session?.user?.id || null,
             },
             listingId,
             user?.name,

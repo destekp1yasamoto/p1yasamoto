@@ -113,7 +113,6 @@ function AddListing({ title, description }) {
   const brandFieldRef = useRef(null)
   const modelFieldRef = useRef(null)
   const cityFieldRef = useRef(null)
-  const selectedPhotosRef = useRef(selectedPhotos)
   const [activeSuggestionField, setActiveSuggestionField] = useState(null)
   const [formValues, setFormValues] = useState({
     brand: activeDraft?.brand || '',
@@ -143,18 +142,6 @@ function AddListing({ title, description }) {
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown)
     }
-  }, [])
-
-  useEffect(() => {
-    selectedPhotosRef.current = selectedPhotos
-  }, [selectedPhotos])
-
-  useEffect(() => () => {
-    selectedPhotosRef.current.forEach((photo) => {
-      if (photo.isObjectUrl && photo.previewUrl) {
-        URL.revokeObjectURL(photo.previewUrl)
-      }
-    })
   }, [])
 
   const handlePhotoChange = (event) => {
@@ -275,8 +262,10 @@ function AddListing({ title, description }) {
     selectedPhotos: selectedPhotos.map((photo) => ({
       name: photo.name,
       size: photo.size,
+      previewUrl: photo.previewUrl || '',
     })),
     coverPhotoIndex,
+    visual: selectedPhotos[coverPhotoIndex]?.previewUrl || '',
     aiNotes,
     aiResult,
   })

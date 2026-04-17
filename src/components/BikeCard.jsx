@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAppState } from '../context/useAppState'
 import { CompareIcon, HeartIcon, PinIcon } from './Icons'
+import { getVisualStyle } from '../lib/visuals'
 
 function BikeCard({ bike }) {
   const navigate = useNavigate()
@@ -43,7 +44,7 @@ function BikeCard({ bike }) {
 
   return (
     <article className="listing-card" onClick={goToDetail} role="button" tabIndex={0}>
-      <div className="listing-card__media" style={{ background: bike.visual }}>
+      <div className="listing-card__media" style={getVisualStyle(bike.visual)}>
         <span className="listing-card__badge">{bike.badge}</span>
         <button
           className={`icon-chip${isFavorite ? ' is-active' : ''}`}
