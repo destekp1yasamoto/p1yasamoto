@@ -112,7 +112,8 @@ begin
     username,
     full_name,
     phone,
-    avatar_url
+    avatar_url,
+    role
   )
   values (
     new.id,
@@ -120,7 +121,11 @@ begin
     coalesce(new.raw_user_meta_data ->> 'username', new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1)),
     coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', new.raw_user_meta_data ->> 'username'),
     nullif(new.raw_user_meta_data ->> 'phone', ''),
-    nullif(coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture'), '')
+    nullif(coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture'), ''),
+    case
+      when lower(coalesce(new.email, '')) = 'destekp1yasamoto@gmail.com' then 'admin'
+      else 'user'
+    end
   )
   on conflict (id) do update
   set
@@ -129,11 +134,19 @@ begin
     full_name = excluded.full_name,
     phone = coalesce(excluded.phone, public.profiles.phone),
     avatar_url = coalesce(excluded.avatar_url, public.profiles.avatar_url),
+    role = case
+      when lower(coalesce(excluded.email, '')) = 'destekp1yasamoto@gmail.com' then 'admin'
+      else public.profiles.role
+    end,
     updated_at = timezone('utc', now());
 
   return new;
 end;
 $$;
+
+update public.profiles
+set role = 'admin'
+where lower(email) = 'destekp1yasamoto@gmail.com';
 
 drop trigger if exists on_auth_user_created on auth.users;
 
