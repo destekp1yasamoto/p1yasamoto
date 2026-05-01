@@ -193,7 +193,6 @@ begin
   into resolved_email
   from public.profiles p
   where lower(p.username) = normalized_identifier
-     or lower(coalesce(p.full_name, '')) = normalized_identifier
      or (
        normalized_phone <> ''
        and coalesce(p.phone, '') = normalized_phone
