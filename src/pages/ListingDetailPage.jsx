@@ -8,15 +8,34 @@ import { useAppState } from '../context/useAppState'
 import { getVisualStyle } from '../lib/visuals'
 import '../App.css'
 
+const reportReasons = [
+  'Sahte ilan',
+  'Yanlis bilgi',
+  'Dolandiricilik supesi',
+  'Uygunsuz icerik',
+  'Yanlis fiyat',
+  'Diger',
+]
+
 function ListingDetailPage() {
   const [activeIndex, setActiveIndex] = useState(0)
+  const [messageFeedback, setMessageFeedback] = useState({ error: '', success: '' })
+  const [reportFeedback, setReportFeedback] = useState({ error: '', success: '' })
+  const [reportReason, setReportReason] = useState(reportReasons[0])
+  const [reportDetails, setReportDetails] = useState('')
+  const [isSendingRequest, setIsSendingRequest] = useState(false)
+  const [isBlockingSeller, setIsBlockingSeller] = useState(false)
+  const [isReporting, setIsReporting] = useState(false)
   const { id } = useParams()
   const navigate = useNavigate()
   const {
     allListings,
+    blockUser,
     comparisons,
     isAuthenticated,
+    isUserBlocked,
     messageRequests,
+    reportListing,
     sendMessageRequest,
     toggleComparison,
     user,
@@ -46,11 +65,8 @@ function ListingDetailPage() {
   const safeIndex = Math.min(activeIndex, Math.max(galleryItems.length - 1, 0))
   const isCompared = comparisons.includes(bike.id)
   const hasPendingRequest = messageRequests.some((item) => item.listingId === bike.id)
-  const isOwner = Boolean(
-    (user?.id && bike.ownerId && user.id === bike.ownerId)
-    || (user?.name && bike.owner && user.name === bike.owner)
-    || (user?.username && bike.owner && user.username === bike.owner),
-  )
+  const isOwner = Boolean(user?.id && bike.ownerId && user.id === bike.ownerId)
+  const sellerBlocked = Boolean(bike.ownerId && isUserBlocked(bike.ownerId))
 
   const handleCompare = () => {
     if (!isAuthenticated) {
@@ -61,7 +77,9 @@ function ListingDetailPage() {
     toggleComparison(bike.id)
   }
 
-  const handleMessageRequest = () => {
+  const handleMessageRequest = async () => {
+    setMessageFeedback({ error: '', success: '' })
+
     if (!isAuthenticated) {
       navigate('/giris')
       return
@@ -71,7 +89,79 @@ function ListingDetailPage() {
       return
     }
 
-    sendMessageRequest(bike)
+    if (sellerBlocked) {
+      setMessageFeedback({ error: 'Bu satici engelli listende oldugu icin mesaj gonderemezsin.', success: '' })
+      return
+    }
+
+    setIsSendingRequest(true)
+
+    try {
+      await sendMessageRequest(bike)
+      setMessageFeedback({ error: '', success: 'Mesaj istegin saticiya gonderildi.' })
+    } catch (error) {
+      setMessageFeedback({ error: error.message || 'Mesaj istegi gonderilemedi.', success: '' })
+    } finally {
+      setIsSendingRequest(false)
+    }
+  }
+
+  const handleBlockSeller = async () => {
+    if (!isAuthenticated) {
+      navigate('/giris')
+      return
+    }
+
+    if (isOwner || !bike.ownerId) {
+      return
+    }
+
+    setMessageFeedback({ error: '', success: '' })
+    setIsBlockingSeller(true)
+
+    try {
+      await blockUser({
+        id: bike.ownerId,
+        name: bike.owner,
+        username: bike.ownerUsername,
+      })
+      setMessageFeedback({ error: '', success: 'Satici engellendi. Artik mesaj veya iletisim istegi gonderemez.' })
+    } catch (error) {
+      setMessageFeedback({ error: error.message || 'Satici engellenemedi.', success: '' })
+    } finally {
+      setIsBlockingSeller(false)
+    }
+  }
+
+  const handleReportSubmit = async (event) => {
+    event.preventDefault()
+    setReportFeedback({ error: '', success: '' })
+
+    if (!isAuthenticated) {
+      navigate('/giris')
+      return
+    }
+
+    if (isOwner || !bike.ownerId) {
+      return
+    }
+
+    setIsReporting(true)
+
+    try {
+      await reportListing({
+        listingId: bike.id,
+        ownerId: bike.ownerId,
+        reason: reportReason,
+        details: reportDetails,
+      })
+      setReportDetails('')
+      setReportFeedback({ error: '', success: 'Ilan inceleme icin admin paneline gonderildi.' })
+    } catch (error) {
+      setReportFeedback({ error: error.message || 'Ilan bildirilemedi.', success: '' })
+    } finally {
+      setIsReporting(false)
+    }
   }
 
   return (
@@ -91,10 +181,7 @@ function ListingDetailPage() {
           <div className="listing-detail__layout">
             <div className="listing-detail__main">
               <article className="detail-gallery">
-                <div
-                  className="detail-gallery__image"
-                  style={getVisualStyle(galleryItems[safeIndex])}
-                >
+                <div className="detail-gallery__image" style={getVisualStyle(galleryItems[safeIndex])}>
                   <span className="detail-gallery__count">
                     {safeIndex + 1}/{galleryItems.length}
                   </span>
@@ -123,7 +210,7 @@ function ListingDetailPage() {
                   onClick={handleCompare}
                 >
                   <CompareIcon />
-                  <span>{isCompared ? 'Karşılaştırmada' : "Karşılaştır'a Ekle"}</span>
+                  <span>{isCompared ? 'Karsilastirmada' : "Karsilastir'a Ekle"}</span>
                 </button>
 
                 <div className="detail-card__specs">
@@ -136,7 +223,7 @@ function ListingDetailPage() {
                     <strong>{bike.model}</strong>
                   </div>
                   <div>
-                    <span>Yıl</span>
+                    <span>Yil</span>
                     <strong>{bike.year}</strong>
                   </div>
                   <div>
@@ -161,7 +248,7 @@ function ListingDetailPage() {
               </article>
 
               <article className="detail-card">
-                <h2>İlan Açıklaması</h2>
+                <h2>Ilan Aciklamasi</h2>
                 <p>{bike.description}</p>
               </article>
 
@@ -169,7 +256,7 @@ function ListingDetailPage() {
                 <section className="section section--tight">
                   <div className="section-bar">
                     <span className="section-bar__dot" />
-                    <h2>BENZER İLANLAR</h2>
+                    <h2>BENZER ILANLAR</h2>
                   </div>
 
                   <div className="cards-grid cards-grid--compact">
@@ -188,40 +275,89 @@ function ListingDetailPage() {
                   <span className="seller-card__avatar">{(bike.owner || 'S').charAt(0)}</span>
                   <div>
                     <strong>{bike.owner}</strong>
-                    <span>Üye</span>
+                    <span>{bike.isVerifiedSeller ? 'Dogrulanmis Satici' : 'Uye'}</span>
                   </div>
                 </div>
                 <div className="seller-card__phone">{bike.phone}</div>
               </article>
 
               <article className="seller-card">
-                <h2>Satıcıya Mesaj</h2>
+                <h2>Saticiya Mesaj</h2>
                 {isOwner ? (
-                  <p>Bu ilan sana ait. Kendine mesaj isteği gönderemezsin.</p>
+                  <p>Bu ilan sana ait. Kendine mesaj istegi gonderemezsin.</p>
                 ) : isAuthenticated ? (
                   <>
-                    <p>Mesaj isteği göndererek sohbet başlatabilirsin.</p>
+                    <p>Mesaj istegi gondererek sohbet baslatabilirsin.</p>
+                    {messageFeedback.error ? <p className="form-error">{messageFeedback.error}</p> : null}
+                    {messageFeedback.success ? <p className="form-success">{messageFeedback.success}</p> : null}
                     <button
                       className="primary-button seller-card__button"
                       type="button"
                       onClick={handleMessageRequest}
-                      disabled={hasPendingRequest}
+                      disabled={hasPendingRequest || isSendingRequest || sellerBlocked}
                     >
-                      {hasPendingRequest ? 'İstek Gönderildi' : 'Mesaj İsteği Gönder'}
+                      {hasPendingRequest ? 'Istek Gonderildi' : isSendingRequest ? 'Gonderiliyor...' : 'Mesaj Istegi Gonder'}
+                    </button>
+                    <button
+                      className="ghost-button seller-card__button"
+                      type="button"
+                      onClick={handleBlockSeller}
+                      disabled={isBlockingSeller || sellerBlocked}
+                    >
+                      {sellerBlocked ? 'Satici Engelli' : isBlockingSeller ? 'Engelleniyor...' : 'Saticiyi Engelle'}
                     </button>
                   </>
                 ) : (
                   <>
-                    <p>Mesaj göndermek için giriş yapın.</p>
+                    <p>Mesaj gondermek icin giris yapin.</p>
                     <Link className="primary-button seller-card__button" to="/giris">
-                      Giriş Yap
+                      Giris Yap
                     </Link>
                   </>
                 )}
               </article>
 
+              {!isOwner ? (
+                <article className="seller-card">
+                  <h2>Ilani Bildir</h2>
+                  <form className="seller-card__report" onSubmit={handleReportSubmit}>
+                    <label className="field-stack">
+                      <span>Sebep</span>
+                      <select
+                        className="input-shell"
+                        value={reportReason}
+                        onChange={(event) => setReportReason(event.target.value)}
+                      >
+                        {reportReasons.map((reason) => (
+                          <option key={reason} value={reason}>
+                            {reason}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="field-stack">
+                      <span>Aciklama</span>
+                      <textarea
+                        className="textarea-shell textarea-shell--compact"
+                        value={reportDetails}
+                        onChange={(event) => setReportDetails(event.target.value)}
+                        placeholder="Kisa bir aciklama ekleyebilirsin."
+                      />
+                    </label>
+
+                    {reportFeedback.error ? <p className="form-error">{reportFeedback.error}</p> : null}
+                    {reportFeedback.success ? <p className="form-success">{reportFeedback.success}</p> : null}
+
+                    <button className="ghost-button seller-card__button" type="submit" disabled={isReporting}>
+                      {isReporting ? 'Gonderiliyor...' : 'Ilani Bildir'}
+                    </button>
+                  </form>
+                </article>
+              ) : null}
+
               <Link className="listing-detail__back" to="/">
-                ← İlanlara dön
+                ← Ilanlara don
               </Link>
             </aside>
           </div>

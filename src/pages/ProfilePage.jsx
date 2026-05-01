@@ -14,6 +14,7 @@ function ProfilePage() {
     username: '',
     phone: '',
     city: '',
+    sellerBio: '',
   })
   const [avatarFile, setAvatarFile] = useState(null)
   const [feedback, setFeedback] = useState({ error: '', success: '' })
@@ -21,6 +22,7 @@ function ProfilePage() {
   const {
     activeChats,
     allListings,
+    _blockedUsers,
     draftListings,
     favorites,
     markNotificationsRead,
@@ -28,6 +30,7 @@ function ProfilePage() {
     notifications,
     publishDraftListing,
     resendVerificationEmail,
+    _unblockUser,
     updateProfile,
     user,
     userListings,

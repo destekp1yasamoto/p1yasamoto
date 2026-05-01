@@ -88,7 +88,10 @@ function BikeCard({ bike }) {
         <div className="listing-card__meta">
           <span>{bike.km}</span>
           <span>{bike.model}</span>
-          <span>{bike.owner}</span>
+          <span>
+            {bike.owner}
+            {bike.isVerifiedSeller ? ' • Dogrulanmis Satici' : ''}
+          </span>
         </div>
       </div>
     </article>

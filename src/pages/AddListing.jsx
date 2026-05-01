@@ -7,6 +7,8 @@ import { useAppState } from '../context/useAppState'
 import { brandModels, popularBrands, popularModels, turkeyCities } from '../data/turkeyData'
 import '../App.css'
 
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+
 function maskPlateValue(plate) {
   return plate
     .split('')
@@ -108,6 +110,8 @@ function AddListing({ title, description }) {
   const [coverPhotoIndex, setCoverPhotoIndex] = useState(activeDraft?.coverPhotoIndex ?? 0)
   const [uploadError, setUploadError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [aiNotes, setAiNotes] = useState(activeDraft?.aiNotes || '')
   const [aiResult, setAiResult] = useState(activeDraft?.aiResult || '')
   const brandFieldRef = useRef(null)
@@ -151,6 +155,22 @@ function AddListing({ title, description }) {
       return
     }
 
+    const invalidTypeFile = files.find((file) => !ALLOWED_IMAGE_TYPES.includes(file.type))
+
+    if (invalidTypeFile) {
+      setUploadError(`"${invalidTypeFile.name}" sadece JPG, JPEG, PNG veya WEBP olabilir.`)
+      event.target.value = ''
+      return
+    }
+
+    const emptyFile = files.find((file) => file.size <= 0)
+
+    if (emptyFile) {
+      setUploadError(`"${emptyFile.name}" bos ya da bozuk gorunuyor.`)
+      event.target.value = ''
+      return
+    }
+
     const oversizedFile = files.find((file) => file.size > 4 * 1024 * 1024)
 
     if (oversizedFile) {
@@ -164,6 +184,7 @@ function AddListing({ title, description }) {
       size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
       previewUrl: URL.createObjectURL(file),
       isObjectUrl: true,
+      file,
     }))
 
     setSelectedPhotos((current) => {
@@ -270,14 +291,41 @@ function AddListing({ title, description }) {
     aiResult,
   })
 
-  const handleSaveDraft = () => {
+  const _handleSaveDraft = () => {
     saveDraftListing(buildPayload())
     setStatusMessage('Taslak kaydedildi. Profilindeki İlanlarım alanından düzenleyebilirsin.')
   }
 
-  const handlePublish = () => {
+  const _handlePublish = () => {
     publishListing(buildPayload())
     navigate('/profil')
+  }
+
+  const handleSaveDraftAction = () => {
+    setIsSavingDraft(true)
+    setStatusMessage('')
+
+    try {
+      saveDraftListing(buildPayload())
+      setStatusMessage('Taslak kaydedildi. Profilindeki Ilanlarim alanindan duzenleyebilirsin.')
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }
+
+  const handlePublishAction = async () => {
+    setUploadError('')
+    setStatusMessage('')
+    setIsPublishing(true)
+
+    try {
+      await publishListing(buildPayload(), selectedPhotos)
+      navigate('/profil')
+    } catch (error) {
+      setUploadError(error.message || 'Ilan yayinlanirken bir sorun olustu.')
+    } finally {
+      setIsPublishing(false)
+    }
   }
 
   const handleGenerateAi = () => {
@@ -564,14 +612,14 @@ function AddListing({ title, description }) {
             {statusMessage ? <p className="form-success">{statusMessage}</p> : null}
 
             <div className="filter-actions">
-              <button className="primary-button" type="button" onClick={handlePublish}>
+              <button className="primary-button" type="button" onClick={handlePublishAction} disabled={isPublishing || isSavingDraft}>
                 İlanı Yayına Hazırla
               </button>
-              <button className="ghost-button" type="button" onClick={handleSaveDraft}>
-                Taslak Kaydet
+              <button className="ghost-button" type="button" onClick={handleSaveDraftAction} disabled={isSavingDraft || isPublishing}>
+                {isSavingDraft ? 'Kaydediliyor...' : 'Taslak Kaydet'}
               </button>
-              <button className="secondary-button" type="button" onClick={handleGenerateAi}>
-                YZ Yorumla
+              <button className="secondary-button" type="button" onClick={handleGenerateAi} disabled={isPublishing}>
+                {isPublishing ? 'Yukleniyor...' : 'YZ Yorumla'}
               </button>
             </div>
 
